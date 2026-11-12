@@ -123,7 +123,7 @@ selected_spot_name = st.selectbox("📍 Select Surf Spot", list(SPOTS.keys()))
 spot = SPOTS[selected_spot_name]
 short_spot_name = selected_spot_name.split(" (")[0].split(" - ")[-1]
 
-# 2. Side-by-side Live Cam Buttons (compact on mobile)
+# 2. Side-by-side Live Cam Buttons
 st.markdown(
     f"""
     <div class="compact-row">
@@ -261,7 +261,7 @@ def format_rating_badge(score):
 # Load spot forecast
 df, daily_df, water_temp = get_forecast_data(spot["lat"], spot["lon"])
 
-# 3. Side-by-side Water Temp, Sunrise & Sunset Cards (compact on mobile)
+# 3. Side-by-side Water Temp, Sunrise & Sunset Cards
 temp_display, wetsuit_advice = get_wetsuit_recommendation(water_temp)
 today_sunrise = daily_df.iloc[0]["Sunrise"].strftime("%H:%M")
 today_sunset = daily_df.iloc[0]["Sunset"].strftime("%H:%M")
@@ -322,30 +322,65 @@ elif df_daylight["Wave Height (m)"].max() < 0.45:
 else:
     st.info("No high-scoring sessions yet, check the highest-rated daylight hours in the table below.")
 
-# 6. Horizontally scrollable wave height chart locked to max peak
-st.subheader("Wave Height Chart (Swipe chart horizontally →)")
+# 6. Horizontally scrollable wave height chart with full-height touch detection
+st.subheader("Wave Height Chart (Tap anywhere or swipe →)")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
     max_wave = 1.0
 
-chart = (
-    alt.Chart(df)
-    .mark_line(point=alt.OverlayMarkDef(size=45))
-    .encode(
-        x=alt.X(
-            "DateTime:T",
-            title="Time",
-            axis=alt.Axis(format="%d/%m %H:%M", labelAngle=-45, tickCount=24),
-        ),
-        y=alt.Y(
-            "Wave Height (m):Q",
-            scale=alt.Scale(domain=[0, max_wave]),
-            title="Wave Height (m)",
-        ),
-        tooltip=["Time", "Rating", "Wave Height (m)", "Swell (m)", "Period (s)", "Wind Type", "Wind Speed (km/h)"],
-    )
-    .properties(width=1400, height=300)
+nearest = alt.selection_point(
+    nearest=True,
+    on="pointerover, pointerdown",
+    fields=["DateTime"],
+    empty=False,
 )
+
+base = alt.Chart(df).encode(
+    x=alt.X(
+        "DateTime:T",
+        title="Time",
+        axis=alt.Axis(format="%d/%m %H:%M", labelAngle=-45, tickCount=24),
+    )
+)
+
+line = base.mark_line().encode(
+    y=alt.Y(
+        "Wave Height (m):Q",
+        scale=alt.Scale(domain=[0, max_wave]),
+        title="Wave Height (m)",
+    )
+)
+
+# Invisible full-height vertical strips so tapping anywhere above/below the line shows the tooltip
+selectors = (
+    base.mark_rule(strokeWidth=20)
+    .encode(
+        opacity=alt.value(0),
+        tooltip=[
+            alt.Tooltip("Time:N", title="Time"),
+            alt.Tooltip("Rating:N", title="Rating"),
+            alt.Tooltip("Wave Height (m):Q", title="Wave Height (m)"),
+            alt.Tooltip("Swell (m):Q", title="Swell (m)"),
+            alt.Tooltip("Period (s):Q", title="Period (s)"),
+            alt.Tooltip("Wind Type:N", title="Wind"),
+            alt.Tooltip("Wind Speed (km/h):Q", title="Wind Speed (km/h)"),
+        ],
+    )
+    .add_params(nearest)
+)
+
+# Vertical dashed crosshair on the selected hour
+rules = base.mark_rule(color="gray", strokeDash=[4, 4]).encode(
+    opacity=alt.condition(nearest, alt.value(0.85), alt.value(0))
+)
+
+# Highlighted dot on the wave curve for the selected hour
+points = base.mark_circle(size=85, color="#00B4D8").encode(
+    y=alt.Y("Wave Height (m):Q", scale=alt.Scale(domain=[0, max_wave])),
+    opacity=alt.condition(nearest, alt.value(1), alt.value(0.35)),
+)
+
+chart = alt.layer(line, selectors, rules, points).properties(width=1400, height=300)
 
 st.altair_chart(chart, use_container_width=False)
 
