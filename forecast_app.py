@@ -137,7 +137,7 @@ st.markdown(
     .sf-row:last-child {{ border-bottom: none; }}
     
     .sf-time {{ font-size: 0.8rem; font-weight: 600; color: {sub_text}; }}
-    .sf-val-main {{ font-size: 0.95rem; font-weight: 800; color: {text_color}; margin-bottom: 2px; }}
+    .sf-val-main {{ font-size: 0.95rem; font-weight: 800; margin-bottom: 2px; }}
     .sf-val-sub {{ font-size: 0.75rem; font-weight: 600; color: {text_color}; }}
     
     .rating-badge {{
@@ -330,8 +330,11 @@ if pd.isna(max_wave_m) or max_wave_m <= 0: max_wave_m = 1.0
 
 def fmt_cm_ft(val):
     if pd.isna(val): return "-"
-    cm, ft = int(round(val * 100)), round(val * 3.28084, 1)
-    return f"{cm} cm / {ft} ft"
+    ft = round(val * 3.28084, 1)
+    if val < 1.0:
+        return f"{int(round(val * 100))}cm / {ft}ft"
+    else:
+        return f"{val:.1f}m / {ft}ft"
 
 y_top = fmt_cm_ft(max_wave_m)
 y_3q = fmt_cm_ft(max_wave_m * 0.75)
@@ -391,7 +394,7 @@ html_chart = f"""
   <div class="chart-card" id="chartCard">
     <div class="c-header">
       <div class="c-title">Wave Height</div>
-      <div class="hint-badge">Tap & Drag</div>
+      <div class="hint-badge">Long Press to Drag</div>
     </div>
     <div class="data-box" id="dataBox"></div>
     <div class="chart-shell">
@@ -499,17 +502,57 @@ html_chart = f"""
         scrubLine.setAttribute("opacity", "0"); activeDot.setAttribute("opacity", "0"); 
     }};
 
-    // Allow native scrolling without freezing
-    scrollArea.addEventListener("touchmove", (e) => {{
+    // Logic for long-press to drag
+    let isDragging = false;
+    let startX = 0, startY = 0;
+    let longPressTimer = null;
+
+    scrollArea.addEventListener("touchstart", (e) => {{
         if(e.touches.length !== 1) return;
-        const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
-        const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
-        if (selectedIdx !== idx) {{
-            showData(idx);
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isDragging = false;
+
+        if (isBoxVisible) {{
+            const relX = startX - svg.getBoundingClientRect().left;
+            const currentScrubX = parseFloat(scrubLine.getAttribute("x1"));
+            
+            // Check if touch is near the active line (within ~40px)
+            if (Math.abs(relX - currentScrubX) < 40) {{
+                longPressTimer = setTimeout(() => {{
+                    isDragging = true;
+                    if(navigator.vibrate) navigator.vibrate(20);
+                }}, 250); // 250ms long press activates dragging
+            }}
         }}
     }}, {{passive: true}});
 
+    scrollArea.addEventListener("touchmove", (e) => {{
+        if(e.touches.length !== 1) return;
+        
+        if (!isDragging) {{
+            const dx = Math.abs(e.touches[0].clientX - startX);
+            const dy = Math.abs(e.touches[0].clientY - startY);
+            // If they start swiping away naturally before the timer finishes, cancel the grab
+            if (dx > 10 || dy > 10) clearTimeout(longPressTimer);
+            return; // Allow native scrolling of the graph
+        }}
+        
+        // We are successfully dragging the line -> Prevent native scroll and move the line
+        e.preventDefault();
+        const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
+        const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
+        if (selectedIdx !== idx) showData(idx);
+    }}, {{passive: false}});
+
+    scrollArea.addEventListener("touchend", () => {{
+        clearTimeout(longPressTimer);
+        // Add a slight delay to turn off dragging so a release doesn't trigger a click immediately
+        setTimeout(() => {{ isDragging = false; }}, 50);
+    }}, {{passive: true}});
+
     scrollArea.addEventListener("click", (e) => {{
+        if (isDragging) return; // Ignore click if we just finished dragging
         const relX = e.clientX - svg.getBoundingClientRect().left;
         const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
         if (isBoxVisible && idx === selectedIdx) hideData(); else showData(idx);
@@ -527,15 +570,42 @@ def generate_html_rows(day_df):
     for _, row in day_df.iterrows():
         time_str = row["HourStr"]
         
-        # Surf Info
+        # Wave height dynamic coloring & formatting (cm vs m + ft)
         wv_m = row["Wave Height (m)"]
-        surf_str = f"{wv_m:.1f}m" if not pd.isna(wv_m) else "Flat"
+        if pd.isna(wv_m):
+            wv_color = text_color
+            surf_str = "Flat"
+        else:
+            if wv_m <= 0.6:
+                wv_color = "#DC2626" if not is_dark else "#EF4444"  # Red
+            elif wv_m <= 0.9:
+                wv_color = "#D97706" if not is_dark else "#F59E0B"  # Orange
+            else:
+                wv_color = "#16A34A" if not is_dark else "#22C55E"  # Green
+            
+            ft_val = round(wv_m * 3.28084, 1)
+            if wv_m < 1.0:
+                display_text = f"{int(round(wv_m * 100))}cm / {ft_val}ft"
+            else:
+                display_text = f"{wv_m:.1f}m / {ft_val}ft"
+                
+            surf_str = f"<span class='sf-val-main' style='color: {wv_color}; font-size: 0.85rem; white-space: nowrap;'>{display_text}</span>"
+            
         rt_txt, rt_col, rt_bg = get_rating_details(row["Score"], is_dark)
         
         # Swell Info
         sw_m = row["Swell (m)"]
         sw_p = row["Period (s)"]
-        swell_str = f"{sw_m:.1f}m <span class='sf-val-sub'>{sw_p:.0f}s</span>" if not pd.isna(sw_m) else "-"
+        
+        if pd.isna(sw_m):
+            swell_str = "-"
+        else:
+            sw_ft_val = round(sw_m * 3.28084, 1)
+            if sw_m < 1.0:
+                sw_display = f"{int(round(sw_m * 100))}cm / {sw_ft_val}ft"
+            else:
+                sw_display = f"{sw_m:.1f}m / {sw_ft_val}ft"
+            swell_str = f"<span style='font-size: 0.85rem; white-space: nowrap;'>{sw_display}</span> <span class='sf-val-sub'>{sw_p:.0f}s</span>"
         
         # Wind Info
         w_spd = row["Wind Speed (km/h)"]
@@ -548,7 +618,7 @@ def generate_html_rows(day_df):
         <div class="sf-row">
             <div class="sf-time">{time_str}</div>
             <div class="sf-col">
-                <div class="sf-val-main">{surf_str}</div>
+                {surf_str}<br>
                 <div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div>
             </div>
             <div class="sf-col sf-val-main">{swell_str}</div>
