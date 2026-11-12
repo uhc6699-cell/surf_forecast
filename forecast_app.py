@@ -66,20 +66,20 @@ elif df_daylight["Wave Height (m)"].max() < 0.5:
 else:
     st.info("No ideal offshore windows in the next few days, but check the table below for light-wind sessions.")
 
-# Display static wave height chart locked to exact max peak with clear hour ticks
-st.subheader("Wave Height Chart (24h)")
+# Display horizontally scrollable wave height chart locked to exact max peak
+st.subheader("Wave Height Chart (Swipe horizontally →)")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
     max_wave = 1.0
 
 chart = (
     alt.Chart(df)
-    .mark_line(point=alt.OverlayMarkDef(size=35))
+    .mark_line(point=alt.OverlayMarkDef(size=45))
     .encode(
         x=alt.X(
             "DateTime:T",
             title="Time",
-            axis=alt.Axis(format="%d/%m %H:%M", labelAngle=-45, tickCount=12),
+            axis=alt.Axis(format="%d/%m %H:%M", labelAngle=-45, tickCount=24),
         ),
         y=alt.Y(
             "Wave Height (m):Q",
@@ -88,10 +88,10 @@ chart = (
         ),
         tooltip=["Time", "Wave Height (m)", "Period (s)", "Wind Type", "Wind Speed (km/h)"],
     )
-    .properties(height=300)
+    .properties(width=1400, height=300)
 )
 
-st.altair_chart(chart, use_container_width=True)
+st.altair_chart(chart, use_container_width=False)
 
 # Display full daylight forecast table
 st.subheader("Full Forecast (Daylight Hours)")
