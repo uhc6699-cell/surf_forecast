@@ -120,7 +120,7 @@ st.markdown(
         background: {card_bg}; border-top: 1px solid {border_color};
         display: flex; justify-content: space-around; align-items: center;
         z-index: 9999; padding-bottom: env(safe-area-inset-bottom);
-    }
+    }}
     .nav-icon {{ font-size: 24px; color: {sub_text}; }}
     .nav-icon.active {{ color: {text_color}; }}
     </style>
@@ -410,7 +410,7 @@ html_chart = f"""
     const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
     defs.innerHTML = `<linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="{chart_grad_top}" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="{chart_card_bg if 'card_bg' in locals() else card_bg}" stop-opacity="0.0"/>
+      <stop offset="100%" stop-color="{card_bg}" stop-opacity="0.0"/>
     </linearGradient>`;
     svg.appendChild(defs);
     
