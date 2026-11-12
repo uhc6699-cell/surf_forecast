@@ -57,19 +57,19 @@ st.markdown(
     .cam-buttons { display: flex; gap: 12px; margin-bottom: 16px; }
     .cam-btn-dark, .cam-btn-light {
         flex: 1; padding: 12px 10px; border-radius: 8px; text-align: center;
-        text-decoration: none; font-size: 0.85rem; font-weight: 600;
+        text-decoration: none !important; font-size: 0.85rem; font-weight: 600;
         display: flex; align-items: center; justify-content: center; gap: 6px;
     }
     .cam-btn-dark { background-color: #1A2B4C; color: #FFFFFF !important; }
     .cam-btn-light { background-color: transparent; border: 1px solid #1A2B4C; color: #1A2B4C !important; }
     
     .unified-stat-card {
-        background: #FFFFFF; border-radius: 16px; padding: 18px 10px;
+        background: #FFFFFF; border-radius: 16px; padding: 14px 10px;
         display: flex; justify-content: space-around; align-items: center;
         margin-bottom: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.03);
     }
     .stat-col { text-align: center; flex: 1; }
-    .stat-main { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .stat-main { font-size: 1.15rem; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1.3; }
     .stat-sub { font-size: 0.75rem; font-weight: 600; color: #6B7280 !important; }
     
     [data-testid="stDataFrame"] {
@@ -177,7 +177,7 @@ def get_forecast_data(lat, lon):
 def get_wetsuit_icon_text(temp):
     if temp is None or pd.isna(temp): return "❓", "N/A"
     if temp >= 26.0: return "🩳", "Boardshorts"
-    if temp >= 23.0: return "🩱", "Spring / 2mm"
+    if temp >= 23.0: return "🏄‍♂️", "Spring / 2mm"
     if temp >= 20.0: return "👕", "3/2mm Suit"
     return "🥶", "4/3mm Suit"
 
@@ -276,8 +276,8 @@ st.markdown(
             <div class="stat-sub">{suit_text}</div>
         </div>
         <div class="stat-col">
-            <div class="stat-main">🌅 {today_sunrise}</div>
-            <div class="stat-sub">Sunset {today_sunset}</div>
+            <div class="stat-main" style="font-size: 0.95rem; line-height: 1.4;">🌅 {today_sunrise}<br>🌇 {today_sunset}</div>
+            <div class="stat-sub">זריחה / שקיעה</div>
         </div>
     </div>
     """,
@@ -395,7 +395,6 @@ html_chart = f"""
           svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: padTop + plotHeight, stroke: "#CBD5E1", "stroke-width": "1.5", "stroke-dasharray": "4,4" }}));
         }}
         
-        // Center the day name exactly in the middle of this day's section width
         const midX = (x1 + x2) / 2;
         const dayLabel = createSvg("text", {{ x: midX, y: padTop + 2, fill: "#1A2B4C", "font-size": "11", "font-weight": "800", "text-anchor": "middle" }});
         dayLabel.textContent = coords[bandStart].day;
