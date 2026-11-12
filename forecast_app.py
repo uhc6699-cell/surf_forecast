@@ -6,7 +6,7 @@ import pandas as pd
 LATITUDE = 32.08
 LONGITUDE = 34.78
 
-st.set_page_config(page_title="Surf & Wind Forecast", layout="wide")
+st.set_page_config(page_title="Surf & Wind Forecast", page_icon="🌊", layout="wide")
 st.title("🌊 Surf & Wind Forecast - Next 3 Days")
 
 @st.cache_data
