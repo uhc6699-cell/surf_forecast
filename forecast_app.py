@@ -86,4 +86,39 @@ best_conditions = df_daylight[
 st.subheader("🏄 Session Recommendations")
 if not best_conditions.empty:
     st.success("Classic conditions found! Offshore winds are grooming the swell and opening up the wall for pumping and rail carves. Best windows:")
-    st.dataframe(best_conditions[["Time", "Wave Height (m)", "Period (s)", "Wind Speed (km/
+    st.dataframe(best_conditions[["Time", "Wave Height (m)", "Period (s)", "Wind Speed (km/h)"]], hide_index=True)
+elif df_daylight["Wave Height (m)"].max() < 0.5:
+    st.warning("Looks flat over the next few days. Great time for a dry-land surfskate session to dial in your foot placement.")
+else:
+    st.info("No ideal offshore windows in the next few days, but check the table below for light-wind sessions.")
+
+# Display horizontally scrollable wave height chart locked to exact max peak
+st.subheader("Wave Height Chart (Swipe horizontally →)")
+max_wave = float(df["Wave Height (m)"].max())
+if pd.isna(max_wave) or max_wave <= 0:
+    max_wave = 1.0
+
+chart = (
+    alt.Chart(df)
+    .mark_line(point=alt.OverlayMarkDef(size=45))
+    .encode(
+        x=alt.X(
+            "DateTime:T",
+            title="Time",
+            axis=alt.Axis(format="%d/%m %H:%M", labelAngle=-45, tickCount=24),
+        ),
+        y=alt.Y(
+            "Wave Height (m):Q",
+            scale=alt.Scale(domain=[0, max_wave]),
+            title="Wave Height (m)",
+        ),
+        tooltip=["Time", "Wave Height (m)", "Period (s)", "Wind Type", "Wind Speed (km/h)"],
+    )
+    .properties(width=1400, height=300)
+)
+
+st.altair_chart(chart, use_container_width=False)
+
+# Display full daylight forecast table
+st.subheader("Full Forecast (Daylight Hours)")
+st.dataframe(df_daylight[["Time", "Wave Height (m)", "Period (s)", "Wind Type", "Wind Speed (km/h)"]], hide_index=True)
