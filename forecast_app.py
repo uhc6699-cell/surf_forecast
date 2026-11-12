@@ -4,14 +4,26 @@ import streamlit.components.v1 as components
 import requests
 import pandas as pd
 
-st.set_page_config(page_title="Surf & Wind Forecast", page_icon="🌊", layout="wide")
+# Forced Light Mode configuration
+st.set_page_config(
+    page_title="Surf & Wind Forecast", 
+    page_icon="🌊", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# Minimal Coastal CSS
+# Force Streamlit to render in Light Theme via CSS injection as well
 st.markdown(
     """
     <style>
+    /* Force Light Theme variables globally */
+    :root {
+        color-scheme: light !important;
+    }
+    
     .stApp, .stApp > header {
         background-color: #F2EEE5 !important;
+        color: #1A2B4C !important;
     }
     .block-container {
         padding: 0.5rem 1rem 80px 1rem !important;
@@ -29,7 +41,7 @@ st.markdown(
     
     * {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        color: #1A2B4C;
+        color: #1A2B4C !important;
     }
     
     .custom-header {
@@ -48,10 +60,10 @@ st.markdown(
     
     div[data-testid="stSelectbox"] { margin-top: -15px; margin-bottom: 10px; }
     div[data-testid="stSelectbox"] > div {
-        background: transparent !important; border: none !important; box-shadow: none !important;
+        background: #FFFFFF !important; border: 1px solid #D1D5DB !important; border-radius: 8px !important; box-shadow: none !important;
     }
     div[data-testid="stSelectbox"] * {
-        color: #4B5563 !important; text-align: center !important; font-size: 0.95rem !important; font-weight: 600 !important;
+        color: #1A2B4C !important; text-align: center !important; font-size: 0.95rem !important; font-weight: 600 !important;
     }
     
     .cam-buttons { display: flex; gap: 12px; margin-bottom: 16px; }
@@ -61,7 +73,7 @@ st.markdown(
         display: flex; align-items: center; justify-content: center; gap: 6px;
     }
     .cam-btn-dark { background-color: #1A2B4C; color: #FFFFFF !important; }
-    .cam-btn-light { background-color: transparent; border: 1px solid #1A2B4C; color: #1A2B4C !important; }
+    .cam-btn-light { background-color: #FFFFFF; border: 1px solid #1A2B4C; color: #1A2B4C !important; }
     
     .unified-stat-card {
         background: #FFFFFF; border-radius: 16px; padding: 14px 10px;
