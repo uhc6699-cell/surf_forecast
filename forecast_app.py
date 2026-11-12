@@ -113,7 +113,7 @@ st.markdown(
         border-radius: 12px;
         border: 1px solid {border_color};
         padding: 8px 12px;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.02);
     }}
     .sf-header-row {{
@@ -161,9 +161,9 @@ st.markdown(
     .nav-icon.active {{ color: {text_color}; }}
     
     /* Clean up Streamlit Expander */
-    [data-testid="stExpander"] {{ border: none !important; box-shadow: none !important; background: transparent !important; margin-top: -10px; }}
-    [data-testid="stExpander"] summary {{ background: {card_bg}; border-radius: 8px; border: 1px solid {border_color}; justify-content: center; }}
-    [data-testid="stExpander"] summary p {{ font-weight: 600; color: {text_color}; font-size: 0.85rem; }}
+    [data-testid="stExpander"] {{ border: none !important; box-shadow: none !important; background: transparent !important; margin-top: 0px; margin-bottom: 20px; }}
+    [data-testid="stExpander"] summary {{ background: {db_cell_bg}; border-radius: 8px; border: 1px solid {border_color}; justify-content: center; padding: 10px; }}
+    [data-testid="stExpander"] summary p {{ font-weight: 700; color: {text_color}; font-size: 0.85rem; }}
     [data-testid="stExpander"] .streamlit-expanderContent {{ padding: 0 !important; margin-top: 4px; }}
     </style>
     """,
@@ -245,6 +245,9 @@ def get_forecast_data(lat, lon):
         "Sunrise": pd.to_datetime(wind_data["daily"]["sunrise"]),
         "Sunset": pd.to_datetime(wind_data["daily"]["sunset"]),
     })
+    
+    # מיזוג הטבלאות למניעת שגיאת ה-KeyError
+    df = df.merge(daily_df, on="Date", how="left")
 
     water_temp = wave_data.get("current", {}).get("sea_surface_temperature")
     if water_temp is None:
@@ -356,18 +359,20 @@ html_chart = f"""
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
   * {{ box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }}
-  body {{ margin: 0; font-family: -apple-system, sans-serif; background: transparent; }}
-  .chart-card {{ background: {card_bg}; border-radius: 16px; padding: 16px 8px 10px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border: 1px solid {border_color}; }}
+  body {{ margin: 0; font-family: -apple-system, sans-serif; background: transparent; overflow: hidden; }}
+  .chart-card {{ background: {card_bg}; border-radius: 16px; padding: 16px 8px 10px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border: 1px solid {border_color}; position: relative; }}
   .c-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 4px; }}
   .c-title {{ font-size: 1.05rem; font-weight: 800; color: {text_color}; }}
   .hint-badge {{ font-size: 11px; padding: 2px 8px; border-radius: 999px; background: {db_cell_bg}; color: {sub_text}; font-weight: 600; border: 1px solid {border_color}; }}
   
-  .data-box {{ display: none; width: 100%; margin-bottom: 12px; background: {card_bg}; border: 1px solid {border_color}; border-radius: 12px; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }}
-  .data-box.visible {{ display: block; }}
-  .db-header {{ display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; border-bottom: 1px solid {border_color}; padding-bottom: 6px; margin-bottom: 8px; color: {text_color}; }}
-  .db-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; text-align: center; }}
-  .db-cell {{ background: {db_cell_bg}; border-radius: 8px; padding: 6px 4px; border: 1px solid {border_color}; }}
-  .db-lbl {{ font-size: 10px; color: {sub_text}; margin-bottom: 2px; font-weight: 600;}}
+  .data-box {{ 
+      height: 65px; margin-bottom: 12px; background: {card_bg}; border: 1px solid {border_color}; 
+      border-radius: 12px; padding: 8px 10px; visibility: hidden; opacity: 0; transition: opacity 0.15s ease;
+  }}
+  .data-box.visible {{ visibility: visible; opacity: 1; }}
+  .db-header {{ display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; border-bottom: 1px solid {border_color}; padding-bottom: 4px; margin-bottom: 6px; color: {text_color}; }}
+  .db-grid {{ display: flex; justify-content: space-around; text-align: center; gap: 10px; }}
+  .db-cell {{ flex: 1; background: {db_cell_bg}; border-radius: 8px; padding: 4px; border: 1px solid {border_color}; font-size: 11px; color: {sub_text}; font-weight: 600; }}
   .db-val {{ font-weight: 800; font-size: 12px; color: {text_color}; }}
   .close-btn {{ cursor: pointer; padding: 0 4px; color: {text_color}; }}
   
@@ -378,8 +383,8 @@ html_chart = f"""
     font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1px solid {border_color};
   }}
   .scroll-area {{
-    flex: 1; overflow-x: auto; overflow-y: hidden; touch-action: pan-x pan-y;
-    position: relative; cursor: pointer;
+    flex: 1; overflow-x: auto; overflow-y: hidden; touch-action: pan-y;
+    position: relative; cursor: crosshair;
   }}
 </style>
 </head>
@@ -468,8 +473,10 @@ html_chart = f"""
     const activeDot = createSvg("circle", {{cx: 0, cy: 0, r: "5.5", fill: "{card_bg}", stroke: "{text_color}", "stroke-width": "2.5", opacity: "0"}});
     svg.appendChild(scrubLine); svg.appendChild(activeDot);
     
-    const scrollArea = document.getElementById("scrollArea"), dataBox = document.getElementById("dataBox"), chartCard = document.getElementById("chartCard");
-    let selectedIdx = null, isBoxVisible = false;
+    const scrollArea = document.getElementById("scrollArea");
+    const dataBox = document.getElementById("dataBox");
+    let selectedIdx = null;
+    let isBoxVisible = false;
     
     function showData(idx) {{
       selectedIdx = idx; const c = coords[idx];
@@ -481,24 +488,53 @@ html_chart = f"""
             <span>${{c.time}}</span><span style="color:${{c.ratingColor}}">${{c.rating}}</span><span class="close-btn" onclick="hideData()">✕</span>
         </div>
         <div class="db-grid">
-            <div class="db-cell"><span class="db-lbl">Wave</span><br><span class="db-val">${{c.wave}}</span></div>
-            <div class="db-cell"><span class="db-lbl">Wind</span><br><span class="db-val">${{c.windSpeed}}</span></div>
+            <div class="db-cell">Wave <span class="db-val">${{c.wave}}</span></div>
+            <div class="db-cell">Wind <span class="db-val">${{c.windSpeed}}</span></div>
         </div>
       `;
       isBoxVisible = true; dataBox.classList.add("visible"); 
-      try {{ if (window.frameElement) window.frameElement.style.height = (chartCard.offsetHeight + 10) + "px"; }} catch(e){{}}
     }}
-    window.hideData = function() {{ isBoxVisible = false; dataBox.classList.remove("visible"); scrubLine.setAttribute("opacity", "0"); activeDot.setAttribute("opacity", "0"); }};
+    
+    window.hideData = function() {{ 
+        isBoxVisible = false; dataBox.classList.remove("visible"); 
+        scrubLine.setAttribute("opacity", "0"); activeDot.setAttribute("opacity", "0"); 
+    }};
+
+    // Cleaned up touch logic for butter smooth drag
+    let startX = 0, startY = 0, isScrubbing = false;
+
+    scrollArea.addEventListener("touchstart", (e) => {{
+        if(e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        isScrubbing = false;
+    }}, {{passive: true}});
+
+    scrollArea.addEventListener("touchmove", (e) => {{
+        if(e.touches.length !== 1) return;
+        const dx = Math.abs(e.touches[0].clientX - startX);
+        const dy = Math.abs(e.touches[0].clientY - startY);
+        
+        // Prevent default only if moving horizontally to allow smooth scrub
+        if (dx > dy && dx > 5) {{
+            isScrubbing = true;
+            e.preventDefault(); 
+            const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
+            const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
+            showData(idx);
+        }}
+    }}, {{passive: false}});
+
     scrollArea.addEventListener("click", (e) => {{
-      const relX = e.clientX - svg.getBoundingClientRect().left;
-      const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
-      if (isBoxVisible && idx === selectedIdx) hideData(); else showData(idx);
+        const relX = e.clientX - svg.getBoundingClientRect().left;
+        const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
+        if (isBoxVisible && idx === selectedIdx) hideData(); else showData(idx);
     }});
   </script>
 </body>
 </html>
 """
-components.html(html_chart, height=325)
+components.html(html_chart, height=360)
 
 
 # --- HTML Table Generation (Surfline Style) ---
@@ -522,7 +558,6 @@ def generate_html_rows(day_df):
         w_dir = row["Wind Direction (°)"]
         wind_spd_str = f"{w_spd:.0f} <span class='sf-val-sub'>kph</span>" if not pd.isna(w_spd) else "-"
         
-        # Wind Arrow logic (arrow points to where wind is going)
         arrow_deg = w_dir if not pd.isna(w_dir) else 0
 
         html += f"""
@@ -586,12 +621,9 @@ for i, d in enumerate(unique_dates):
         st.markdown(summary_html, unsafe_allow_html=True)
 
     # Hourly Expander
-    with st.expander("Show hourly daylight breakdown"):
+    with st.expander("🔽 Show all daylight hours"):
         hourly_html = f"""
         <div class="sf-table-container" style="box-shadow: none; border: none; margin-bottom: 0;">
-            <div class="sf-header-row">
-                <div></div><div>Surf</div><div>Swell</div><div>Wind</div>
-            </div>
             {generate_html_rows(day_dl_df)}
         </div>
         """
