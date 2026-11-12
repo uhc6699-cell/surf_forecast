@@ -211,9 +211,9 @@ def get_wetsuit_recommendation(temp):
 def format_height_with_unit(val):
     if pd.isna(val):
         return "-"
-    if val < 1.0:
-        return f"{int(round(val * 100))} cm"
-    return f"{round(val, 2):g} m"
+    cm = int(round(val * 100))
+    ft = round(val * 3.28084, 1)
+    return f"{cm} cm / {ft} ft"
 
 
 def format_period_with_unit(val):
@@ -234,12 +234,15 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     ws = row["Wind Speed (km/h)"]
     wd = row["Wind Direction (°)"]
 
-    if pd.isna(h) or h < 0.35:
+    if pd.isna(h) or h < 0.2:
         return 1.0
 
-    if h < 0.5:
-        height_score = 1.5
-    elif h < 0.7:
+    # If wave height is less than 60 cm (0.6m), rating is strictly below 5/10
+    if h < 0.6:
+        return round(min(4.9, 1.5 + (h / 0.6) * 3.0), 1)
+
+    # 1. Wave height score (max 4.0 pts)
+    if h < 0.7:
         height_score = 2.4
     elif h < 1.0:
         height_score = 3.3
@@ -248,6 +251,7 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     else:
         height_score = 3.2
 
+    # 2. Wave period score (max 2.5 pts)
     if pd.isna(p) or p < 5.0:
         period_score = 0.5
     elif p < 6.5:
@@ -257,6 +261,7 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     else:
         period_score = 2.5
 
+    # 3. Wind quality score (max 3.5 pts)
     if pd.isna(wd) or pd.isna(ws):
         wind_score = 1.5
     elif is_angle_in_range(wd, *offshore_range):
@@ -268,7 +273,7 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     else:
         wind_score = 2.0 if ws <= 15 else 1.1
 
-    return min(10.0, max(1.0, round(height_score + period_score + wind_score, 1)))
+    return min(10.0, max(5.0, round(height_score + period_score + wind_score, 1)))
 
 
 def format_rating_badge(score):
@@ -276,7 +281,7 @@ def format_rating_badge(score):
         return f"{score}/10 🔥"
     elif score >= 6.5:
         return f"{score}/10 ✅"
-    elif score >= 4.5:
+    elif score >= 5.0:
         return f"{score}/10 👌"
     return f"{score}/10 💤"
 
@@ -293,7 +298,6 @@ def style_table_by_day(source_df, cols):
 
 
 def get_full_table_height(num_rows):
-    # 35px per data row + 38px header + 6px buffer so vertical scrollbar never appears
     return (num_rows + 1) * 35 + 8
 
 
@@ -392,7 +396,6 @@ def render_touch_scrub_chart(df, max_wave):
         color: #48CAE4;
         font-weight: 600;
       }}
-      /* Data box sits ABOVE the chart so it never covers the wave line */
       .data-box {{
         display: none;
         width: 100%;
@@ -451,14 +454,14 @@ def render_touch_scrub_chart(df, max_wave):
         height: 290px;
       }}
       .y-axis {{
-        width: 46px;
+        width: 65px;
         flex-shrink: 0;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
         padding: 16px 6px 46px 0;
         text-align: right;
-        font-size: 10.5px;
+        font-size: 9.5px;
         color: #9AA5B1;
         border-right: 1px solid rgba(255, 255, 255, 0.12);
       }}
@@ -484,7 +487,6 @@ def render_touch_scrub_chart(df, max_wave):
           <div class="hint-badge" id="hintBadge">Tap • Hold to drag</div>
         </div>
 
-        <!-- Data box positioned above the chart -->
         <div class="data-box" id="dataBox"></div>
 
         <div class="chart-shell">
@@ -505,7 +507,6 @@ def render_touch_scrub_chart(df, max_wave):
         const maxWave = {max_wave};
         const dayColors = {json.dumps(DAY_HEX)};
 
-        // Render legend
         const legendEl = document.getElementById("legend");
         dayLegends.forEach(item => {{
           const div = document.createElement("div");
@@ -514,7 +515,6 @@ def render_touch_scrub_chart(df, max_wave):
           legendEl.appendChild(div);
         }});
 
-        // SVG dimensions
         const stepX = 22;
         const padLeft = 14;
         const padRight = 20;
@@ -535,7 +535,6 @@ def render_touch_scrub_chart(df, max_wave):
           return el;
         }}
 
-        // Compute coordinates
         const coords = points.map((p, i) => {{
           const x = padLeft + i * stepX;
           const ratio = Math.min(1, Math.max(0, p.waveRaw / maxWave));
@@ -543,7 +542,6 @@ def render_touch_scrub_chart(df, max_wave):
           return {{ ...p, x, y, idx: i }};
         }});
 
-        // Background color bands per day
         let bandStart = 0;
         for (let i = 1; i <= coords.length; i++) {{
           if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
@@ -562,7 +560,6 @@ def render_touch_scrub_chart(df, max_wave):
           }}
         }}
 
-        // Horizontal grid lines
         [0, 0.5, 1].forEach(frac => {{
           const gy = padTop + plotHeight * (1 - frac);
           svg.appendChild(createSvgEl("line", {{
@@ -572,7 +569,6 @@ def render_touch_scrub_chart(df, max_wave):
           }}));
         }});
 
-        // Wave curve path
         if (coords.length > 0) {{
           const pathD = coords.map((c, idx) => `${{idx === 0 ? "M" : "L"}} ${{c.x}} ${{c.y}}`).join(" ");
           svg.appendChild(createSvgEl("path", {{
@@ -585,7 +581,6 @@ def render_touch_scrub_chart(df, max_wave):
           }}));
         }}
 
-        // X-axis labels every 3 hours & hour dots
         coords.forEach((c, idx) => {{
           const dotColor = dayColors[c.dayIdx % dayColors.length];
           svg.appendChild(createSvgEl("circle", {{
@@ -613,7 +608,6 @@ def render_touch_scrub_chart(df, max_wave):
           }}
         }});
 
-        // Interactive vertical scrub bar + glowing active dot
         const scrubLine = createSvgEl("line", {{
           x1: 0, y1: padTop, x2: 0, y2: padTop + plotHeight,
           stroke: "#48CAE4",
@@ -729,13 +723,11 @@ def render_touch_scrub_chart(df, max_wave):
           syncIframeHeight();
         }}
 
-        // Tapping the data box itself closes it
         dataBox.addEventListener("click", (e) => {{
           e.stopPropagation();
           closeAllSelection();
         }});
 
-        // Universal short tap / click handler (works reliably on Android, iOS, and Desktop)
         scrollArea.addEventListener("click", (e) => {{
           if (ignoreNextClick) {{
             ignoreNextClick = false;
@@ -750,7 +742,6 @@ def render_touch_scrub_chart(df, max_wave):
           }}
         }});
 
-        // Touch handlers for long-press scrub mode (while letting normal taps & swipes pass through)
         scrollArea.addEventListener("touchstart", (e) => {{
           if (e.touches.length !== 1) return;
           const t = e.touches[0];
@@ -787,7 +778,6 @@ def render_touch_scrub_chart(df, max_wave):
             return;
           }}
 
-          // Locked in scrub mode: prevent scrolling and drag bar smoothly
           e.preventDefault();
           const idx = getNearestIndex(t.clientX);
           if (idx !== selectedIdx) {{
@@ -818,7 +808,6 @@ def render_touch_scrub_chart(df, max_wave):
         scrollArea.addEventListener("touchend", endTouch, {{ passive: true }});
         scrollArea.addEventListener("touchcancel", endTouch, {{ passive: true }});
 
-        // Desktop mouse drag support
         let mouseDown = false;
         let mouseDragged = false;
         let mouseDownX = 0;
@@ -862,7 +851,6 @@ def render_touch_scrub_chart(df, max_wave):
 # Load spot forecast
 df, daily_df, water_temp = get_forecast_data(spot["lat"], spot["lon"])
 
-# Assign day index (0, 1, 2) for consistent color coding
 unique_dates = sorted(df["Date"].unique())
 day_to_idx = {d: i for i, d in enumerate(unique_dates)}
 df["DayIdx"] = df["Date"].map(day_to_idx)
@@ -915,7 +903,7 @@ df_daylight = df[
     & (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# 5. Session Recommendations (color-coded by day, full height)
+# 5. Session Recommendations
 best_conditions = df_daylight[df_daylight["Score"] >= 6.8]
 
 st.subheader("🏄 Session Recommendations")
@@ -934,7 +922,7 @@ elif df_daylight["Wave Height (m)"].max() < 0.45:
 else:
     st.info("No high-scoring sessions yet, check the highest-rated daylight hours in the table below.")
 
-# 6. Interactive Wave Height Chart (short tap selects immediately, long press drags)
+# 6. Interactive Wave Height Chart
 st.subheader("Wave Height Chart")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
@@ -942,7 +930,7 @@ if pd.isna(max_wave) or max_wave <= 0:
 
 render_touch_scrub_chart(df, max_wave)
 
-# 7. Full Daylight Forecast Table (color-coded by day, fully expanded vertically)
+# 7. Full Daylight Forecast Table
 st.subheader("Full Daylight Forecast (Dawn to Dusk)")
 full_cols = ["Time", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
 st.dataframe(
