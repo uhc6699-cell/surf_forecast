@@ -107,34 +107,45 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
-    /* Surfline Style Table CSS */
+    /* Surfline Style Table CSS with vertical dividers */
     .sf-table-container {{
         background: {card_bg};
         border-radius: 12px;
         border: 1px solid {border_color};
-        padding: 8px 12px;
         margin-bottom: 4px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+        overflow: hidden;
     }}
     .sf-header-row {{
         display: grid;
         grid-template-columns: 0.8fr 1.2fr 1.5fr 1fr;
-        padding-bottom: 8px;
         border-bottom: 1px solid {border_color};
         text-align: center;
         font-size: 0.75rem;
         font-weight: 700;
         color: {sub_text};
+        background: {db_cell_bg};
     }}
     .sf-row {{
         display: grid;
         grid-template-columns: 0.8fr 1.2fr 1.5fr 1fr;
-        padding: 12px 0;
         border-bottom: 1px solid {border_color};
-        align-items: center;
+        align-items: stretch;
         text-align: center;
     }}
     .sf-row:last-child {{ border-bottom: none; }}
+    
+    /* Vertical Dividers */
+    .sf-header-row > div, .sf-row > div {{
+        padding: 10px 4px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }}
+    .sf-header-row > div:not(:last-child), .sf-row > div:not(:last-child) {{
+        border-right: 1px solid {border_color};
+    }}
     
     .sf-time {{ font-size: 0.8rem; font-weight: 600; color: {sub_text}; }}
     .sf-val-main {{ font-size: 0.95rem; font-weight: 800; margin-bottom: 2px; }}
@@ -142,7 +153,7 @@ st.markdown(
     
     .rating-badge {{
         display: inline-block; font-size: 0.65rem; font-weight: 800;
-        padding: 2px 6px; border-radius: 4px; margin-top: 2px; text-transform: uppercase;
+        padding: 2px 6px; border-radius: 4px; margin-top: 4px; text-transform: uppercase;
     }}
     
     .wind-arrow-container {{
@@ -409,7 +420,10 @@ html_chart = f"""
   <script>
     const points = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
-    const stepX = 28, padLeft = 14, padRight = 20, padTop = 18, padBottom = 38;
+    
+    // REDUCED stepX FROM 28 to 21 TO BRING HOURS CLOSER TOGETHER
+    const stepX = 21, padLeft = 14, padRight = 20, padTop = 18, padBottom = 38;
+    
     const plotHeight = 185 - padTop - padBottom;
     const svgWidth = Math.max(400, padLeft + padRight + (points.length - 1) * stepX);
     const svg = document.getElementById("waveSvg");
@@ -464,7 +478,7 @@ html_chart = f"""
     
     coords.forEach(c => {{
       if (c.hour === 6 || c.hour === 12 || c.hour === 17) {{
-        svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "5", fill: "{card_bg}", stroke: c.ratingColor, "stroke-width": "2.5" }}));
+        svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "4.5", fill: "{card_bg}", stroke: c.ratingColor, "stroke-width": "2.5" }}));
         const label = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "{sub_text}", "font-size": "10", "font-weight": "700", "text-anchor": "middle" }});
         label.textContent = c.time.split(" ")[1];
         svg.appendChild(label);
@@ -502,7 +516,6 @@ html_chart = f"""
         scrubLine.setAttribute("opacity", "0"); activeDot.setAttribute("opacity", "0"); 
     }};
 
-    // Logic for long-press to drag
     let isDragging = false;
     let startX = 0, startY = 0;
     let longPressTimer = null;
@@ -517,12 +530,11 @@ html_chart = f"""
             const relX = startX - svg.getBoundingClientRect().left;
             const currentScrubX = parseFloat(scrubLine.getAttribute("x1"));
             
-            // Check if touch is near the active line (within ~40px)
             if (Math.abs(relX - currentScrubX) < 40) {{
                 longPressTimer = setTimeout(() => {{
                     isDragging = true;
                     if(navigator.vibrate) navigator.vibrate(20);
-                }}, 250); // 250ms long press activates dragging
+                }}, 250);
             }}
         }}
     }}, {{passive: true}});
@@ -533,12 +545,10 @@ html_chart = f"""
         if (!isDragging) {{
             const dx = Math.abs(e.touches[0].clientX - startX);
             const dy = Math.abs(e.touches[0].clientY - startY);
-            // If they start swiping away naturally before the timer finishes, cancel the grab
             if (dx > 10 || dy > 10) clearTimeout(longPressTimer);
-            return; // Allow native scrolling of the graph
+            return;
         }}
         
-        // We are successfully dragging the line -> Prevent native scroll and move the line
         e.preventDefault();
         const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
         const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
@@ -547,12 +557,11 @@ html_chart = f"""
 
     scrollArea.addEventListener("touchend", () => {{
         clearTimeout(longPressTimer);
-        // Add a slight delay to turn off dragging so a release doesn't trigger a click immediately
         setTimeout(() => {{ isDragging = false; }}, 50);
     }}, {{passive: true}});
 
     scrollArea.addEventListener("click", (e) => {{
-        if (isDragging) return; // Ignore click if we just finished dragging
+        if (isDragging) return; 
         const relX = e.clientX - svg.getBoundingClientRect().left;
         const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
         if (isBoxVisible && idx === selectedIdx) hideData(); else showData(idx);
