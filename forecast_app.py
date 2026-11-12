@@ -258,7 +258,7 @@ df["Swell"] = df["Swell (m)"].apply(format_height_with_unit)
 df["Period"] = df["Period (s)"].apply(lambda p: f"{round(p, 1):g} s" if not pd.isna(p) else "-")
 df["Wind Speed"] = df["Wind Speed (km/h)"].apply(lambda s: f"{round(s, 1):g} km/h" if not pd.isna(s) else "-")
 
-# Stats Card
+# Stats Card in English
 temp_str = f"{water_temp:.1f}°C" if water_temp else "N/A"
 suit_icon, suit_text = get_wetsuit_icon_text(water_temp)
 today_sunrise = daily_df.iloc[0]["Sunrise"].strftime("%H:%M")
@@ -269,7 +269,7 @@ st.markdown(
     <div class="unified-stat-card">
         <div class="stat-col">
             <div class="stat-main">🌡️ {temp_str}</div>
-            <div class="stat-sub">טמפרטורת מים</div>
+            <div class="stat-sub">Water Temp</div>
         </div>
         <div class="stat-col">
             <div class="stat-main">{suit_icon}</div>
@@ -277,7 +277,7 @@ st.markdown(
         </div>
         <div class="stat-col">
             <div class="stat-main" style="font-size: 0.95rem; line-height: 1.4;">🌅 {today_sunrise}<br>🌇 {today_sunset}</div>
-            <div class="stat-sub">זריחה / שקיעה</div>
+            <div class="stat-sub">Sunrise / Sunset</div>
         </div>
     </div>
     """,
@@ -384,7 +384,6 @@ html_chart = f"""
     
     const coords = points.map((p, i) => ({{ ...p, x: padLeft + i * stepX, y: padTop + plotHeight * (1 - Math.min(1, Math.max(0, p.waveRaw / maxWave))) }}));
     
-    // Day separators + Centered Day Name at the top of each day section
     let bandStart = 0;
     for (let i = 1; i <= coords.length; i++) {{
       if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
@@ -417,7 +416,6 @@ html_chart = f"""
     svg.appendChild(createSvg("path", {{ d: fillD, fill: "url(#waveGrad)" }}));
     svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "#1A2B4C", "stroke-width": "3", "stroke-linecap": "round" }}));
     
-    // Draw Key Dots (6, 12, 17) with hours below them
     coords.forEach(c => {{
       if (c.hour === 6 || c.hour === 12 || c.hour === 17) {{
         svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "5", fill: "#FFFFFF", stroke: c.ratingColor, "stroke-width": "2.5" }}));
