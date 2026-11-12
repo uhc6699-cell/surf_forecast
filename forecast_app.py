@@ -5,9 +5,11 @@ import requests
 import pandas as pd
 import datetime
 
-# Initialize Theme State (Default to Light)
+# Initialize Theme & Unit State
 if "theme" not in st.session_state:
     st.session_state.theme = "light"
+if "unit" not in st.session_state:
+    st.session_state.unit = "metric"
 
 st.set_page_config(
     page_title="Surf & Wind Forecast", 
@@ -107,6 +109,24 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
+    /* Streamlit Button Styling (For the Unit Toggle) */
+    div[data-testid="stButton"] button {{
+        background-color: {card_bg} !important;
+        border: 1px solid {border_color} !important;
+        color: {text_color} !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        min-height: 32px !important;
+        padding: 2px 12px !important;
+        margin-bottom: -10px;
+    }}
+    div[data-testid="stButton"] button:hover {{
+        border-color: {text_color} !important;
+    }}
+    div[data-testid="stButton"] button p {{
+        font-size: 0.85rem !important;
+    }}
+
     /* Surfline Style Table CSS with vertical dividers */
     .sf-table-container {{
         background: {card_bg};
@@ -307,6 +327,7 @@ df, daily_df, water_temp = get_forecast_data(spot["lat"], spot["lon"])
 unique_dates = sorted(df["Date"].unique())
 df["DayIdx"] = df["Date"].map({d: i for i, d in enumerate(unique_dates)})
 df["Score"] = df.apply(lambda r: calculate_surf_rating(r, spot["offshore"], spot["onshore"]), axis=1)
+unit_sys = st.session_state.unit
 
 # Stats Card in English
 temp_str = f"{water_temp:.1f}°C" if water_temp else "N/A"
@@ -339,18 +360,26 @@ df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
 max_wave_m = float(df_chart["Wave Height (m)"].max())
 if pd.isna(max_wave_m) or max_wave_m <= 0: max_wave_m = 1.0
 
-def fmt_cm_ft(val):
+def fmt_chart_y(val, u_sys):
     if pd.isna(val): return "-"
-    ft = round(val * 3.28084, 1)
-    if val < 1.0:
-        return f"{int(round(val * 100))}cm / {ft}ft"
+    if u_sys == "metric":
+        if val < 1.0: return f"{int(round(val * 100))} cm"
+        else: return f"{val:.1f} m"
     else:
-        return f"{val:.1f}m / {ft}ft"
+        return f"{round(val * 3.28084, 1)} ft"
 
-y_top = fmt_cm_ft(max_wave_m)
-y_3q = fmt_cm_ft(max_wave_m * 0.75)
-y_mid = fmt_cm_ft(max_wave_m * 0.5)
-y_1q = fmt_cm_ft(max_wave_m * 0.25)
+def fmt_chart_tooltip(val, u_sys):
+    if pd.isna(val): return "-"
+    if u_sys == "metric":
+        if val < 1.0: return f"{int(round(val * 100))}cm"
+        else: return f"{val:.1f}m"
+    else:
+        return f"{round(val * 3.28084, 1)}ft"
+
+y_top = fmt_chart_y(max_wave_m, unit_sys)
+y_3q = fmt_chart_y(max_wave_m * 0.75, unit_sys)
+y_mid = fmt_chart_y(max_wave_m * 0.5, unit_sys)
+y_1q = fmt_chart_y(max_wave_m * 0.25, unit_sys)
 
 points_data = []
 for _, row in df_chart.iterrows():
@@ -359,7 +388,7 @@ for _, row in df_chart.iterrows():
     points_data.append({
         "time": row["Time"], "day": row["Day"], "hour": int(row["DateTime"].hour),
         "dayIdx": int(row["DayIdx"]), "ratingColor": hex_color, "rating": f"{row['Score']}/10",
-        "wave": fmt_cm_ft(val), "swell": fmt_cm_ft(row["Swell (m)"]), 
+        "wave": fmt_chart_tooltip(val, unit_sys), "swell": fmt_chart_tooltip(row["Swell (m)"], unit_sys), 
         "period": f"{round(row['Period (s)'],1)}s" if not pd.isna(row["Period (s)"]) else "-",
         "windSpeed": f"{round(row['Wind Speed (km/h)'],1)} km/h" if not pd.isna(row["Wind Speed (km/h)"]) else "-",
         "waveRaw": 0.0 if pd.isna(val) else float(val)
@@ -410,7 +439,7 @@ html_chart = f"""
     <div class="data-box" id="dataBox"></div>
     <div class="chart-shell">
       <div class="y-axis">
-        <span>{y_top}</span><span>{y_3q}</span><span>{y_mid}</span><span>{y_1q}</span><span>0 cm</span>
+        <span>{y_top}</span><span>{y_3q}</span><span>{y_mid}</span><span>{y_1q}</span><span>0</span>
       </div>
       <div class="scroll-area" id="scrollArea">
         <svg id="waveSvg" height="185"></svg>
@@ -574,12 +603,12 @@ components.html(html_chart, height=360)
 
 
 # --- HTML Table Generation (Surfline Style) ---
-def generate_html_rows(day_df):
+def generate_html_rows(day_df, u_sys):
     html = ""
     for _, row in day_df.iterrows():
         time_str = row["HourStr"]
         
-        # Wave height dynamic coloring & formatting (cm vs m + ft)
+        # Wave height dynamic coloring & formatting
         wv_m = row["Wave Height (m)"]
         if pd.isna(wv_m):
             wv_color = text_color
@@ -592,13 +621,15 @@ def generate_html_rows(day_df):
             else:
                 wv_color = "#16A34A" if not is_dark else "#22C55E"  # Green
             
-            ft_val = round(wv_m * 3.28084, 1)
-            if wv_m < 1.0:
-                display_text = f"{int(round(wv_m * 100))}cm / {ft_val}ft"
+            if u_sys == "metric":
+                if wv_m < 1.0:
+                    display_text = f"{int(round(wv_m * 100))}cm"
+                else:
+                    display_text = f"{wv_m:.1f}m"
             else:
-                display_text = f"{wv_m:.1f}m / {ft_val}ft"
+                display_text = f"{round(wv_m * 3.28084, 1)}ft"
                 
-            surf_str = f"<span class='sf-val-main' style='color: {wv_color}; font-size: 0.85rem; white-space: nowrap;'>{display_text}</span>"
+            surf_str = f"<span class='sf-val-main' style='color: {wv_color}; font-size: 0.95rem; white-space: nowrap;'>{display_text}</span>"
             
         rt_txt, rt_col, rt_bg = get_rating_details(row["Score"], is_dark)
         
@@ -609,12 +640,15 @@ def generate_html_rows(day_df):
         if pd.isna(sw_m):
             swell_str = "-"
         else:
-            sw_ft_val = round(sw_m * 3.28084, 1)
-            if sw_m < 1.0:
-                sw_display = f"{int(round(sw_m * 100))}cm / {sw_ft_val}ft"
+            if u_sys == "metric":
+                if sw_m < 1.0:
+                    sw_display = f"{int(round(sw_m * 100))}cm"
+                else:
+                    sw_display = f"{sw_m:.1f}m"
             else:
-                sw_display = f"{sw_m:.1f}m / {sw_ft_val}ft"
-            swell_str = f"<span style='font-size: 0.85rem; white-space: nowrap;'>{sw_display}</span> <span class='sf-val-sub'>{sw_p:.0f}s</span>"
+                sw_display = f"{round(sw_m * 3.28084, 1)}ft"
+                
+            swell_str = f"<span class='sf-val-main' style='font-size: 0.95rem; white-space: nowrap;'>{sw_display}</span> <span class='sf-val-sub'>{sw_p:.0f}s</span>"
         
         # Wind Info
         w_spd = row["Wind Speed (km/h)"]
@@ -630,7 +664,7 @@ def generate_html_rows(day_df):
                 {surf_str}<br>
                 <div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div>
             </div>
-            <div class="sf-col sf-val-main">{swell_str}</div>
+            <div class="sf-col">{swell_str}</div>
             <div class="sf-col">
                 <div class="wind-arrow-container">
                     <span class="sf-val-main">{wind_spd_str}</span>
@@ -647,6 +681,14 @@ df_daylight = df[
     (df["DateTime"] >= (df["Sunrise"] - pd.Timedelta(minutes=30))) & 
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
+
+# Render Unit Toggle Button
+col_spacer, col_btn = st.columns([5, 1])
+with col_btn:
+    toggle_label = "📏 ft" if unit_sys == "metric" else "📏 cm / m"
+    if st.button(toggle_label, use_container_width=True):
+        st.session_state.unit = "imperial" if unit_sys == "metric" else "metric"
+        st.rerun()
 
 # Render Days
 for i, d in enumerate(unique_dates):
@@ -678,7 +720,7 @@ for i, d in enumerate(unique_dates):
             <div class="sf-header-row">
                 <div></div><div>Surf</div><div>Swell</div><div>Wind</div>
             </div>
-            {generate_html_rows(summary_df)}
+            {generate_html_rows(summary_df, unit_sys)}
         </div>
         """
         st.markdown(summary_html, unsafe_allow_html=True)
@@ -687,7 +729,7 @@ for i, d in enumerate(unique_dates):
     with st.expander("Show all daylight hours"):
         hourly_html = f"""
         <div class="sf-table-container" style="box-shadow: none; border: none; margin-bottom: 0;">
-            {generate_html_rows(day_dl_df)}
+            {generate_html_rows(day_dl_df, unit_sys)}
         </div>
         """
         st.markdown(hourly_html, unsafe_allow_html=True)
