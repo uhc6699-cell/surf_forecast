@@ -109,11 +109,11 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
-    /* Streamlit Button Styling (For the Unit Toggle) */
+    /* Dark Blue Button Styling (No Emoji, White Text) */
     div[data-testid="stButton"] button {{
-        background-color: {card_bg} !important;
-        border: 1px solid {border_color} !important;
-        color: {text_color} !important;
+        background-color: #1E3A8A !important;
+        border: 1px solid #1E3A8A !important;
+        color: #FFFFFF !important;
         border-radius: 8px !important;
         font-weight: 700 !important;
         min-height: 32px !important;
@@ -121,9 +121,11 @@ st.markdown(
         margin-bottom: -10px;
     }}
     div[data-testid="stButton"] button:hover {{
-        border-color: {text_color} !important;
+        background-color: #172554 !important;
+        border-color: #172554 !important;
     }}
     div[data-testid="stButton"] button p {{
+        color: #FFFFFF !important;
         font-size: 0.85rem !important;
     }}
 
@@ -450,7 +452,6 @@ html_chart = f"""
     const points = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
     
-    // REDUCED stepX FROM 28 to 21 TO BRING HOURS CLOSER TOGETHER
     const stepX = 21, padLeft = 14, padRight = 20, padTop = 18, padBottom = 38;
     
     const plotHeight = 185 - padTop - padBottom;
@@ -685,7 +686,7 @@ df_daylight = df[
 # Render Unit Toggle Button
 col_spacer, col_btn = st.columns([5, 1])
 with col_btn:
-    toggle_label = "📏 ft" if unit_sys == "metric" else "📏 cm / m"
+    toggle_label = "ft" if unit_sys == "metric" else "cm / m"
     if st.button(toggle_label, use_container_width=True):
         st.session_state.unit = "imperial" if unit_sys == "metric" else "metric"
         st.rerun()
