@@ -109,23 +109,19 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
-    /* Dark Blue Button Styling (No Emoji, White Text) */
+    /* Segmented Control / Button Group Styling */
+    div[data-testid="stHorizontalBlock"] {{
+        gap: 6px !important;
+        margin-bottom: -5px;
+    }}
     div[data-testid="stButton"] button {{
-        background-color: #1E3A8A !important;
-        border: 1px solid #1E3A8A !important;
-        color: #FFFFFF !important;
         border-radius: 8px !important;
         font-weight: 700 !important;
         min-height: 32px !important;
-        padding: 2px 12px !important;
-        margin-bottom: -10px;
-    }}
-    div[data-testid="stButton"] button:hover {{
-        background-color: #172554 !important;
-        border-color: #172554 !important;
+        padding: 2px 8px !important;
+        width: 100% !important;
     }}
     div[data-testid="stButton"] button p {{
-        color: #FFFFFF !important;
         font-size: 0.85rem !important;
     }}
 
@@ -683,13 +679,76 @@ df_daylight = df[
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# Render Unit Toggle Button
-col_spacer, col_btn = st.columns([5, 1])
-with col_btn:
-    toggle_label = "ft" if unit_sys == "metric" else "cm / m"
-    if st.button(toggle_label, use_container_width=True):
-        st.session_state.unit = "imperial" if unit_sys == "metric" else "metric"
-        st.rerun()
+# Render Two Segmented Buttons for Units
+col_spacer, col_cm, col_ft = st.columns([4, 1, 1])
+
+with col_cm:
+    is_metric = (unit_sys == "metric")
+    # Active button style vs Inactive button style injection via markdown or custom button styling
+    if is_metric:
+        st.markdown("""
+        <style>
+        div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
+            background-color: #1E3A8A !important;
+            border: 1px solid #1E3A8A !important;
+            color: #FFFFFF !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {
+            color: #FFFFFF !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <style>
+        div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
+            background-color: """ + card_bg + """ !important;
+            border: 1px solid """ + border_color + """ !important;
+            color: """ + text_color + """ !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {
+            color: """ + text_color + """ !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+    if st.button("cm", use_container_width=True):
+        if unit_sys != "metric":
+            st.session_state.unit = "metric"
+            st.rerun()
+
+with col_ft:
+    if not is_metric:
+        st.markdown("""
+        <style>
+        div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {
+            background-color: #1E3A8A !important;
+            border: 1px solid #1E3A8A !important;
+            color: #FFFFFF !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div:nth-child(3) button p {
+            color: #FFFFFF !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <style>
+        div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {
+            background-color: """ + card_bg + """ !important;
+            border: 1px solid """ + border_color + """ !important;
+            color: """ + text_color + """ !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div:nth-child(3) button p {
+            color: """ + text_color + """ !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+    if st.button("ft", use_container_width=True):
+        if unit_sys != "imperial":
+            st.session_state.unit = "imperial"
+            st.rerun()
 
 # Render Days
 for i, d in enumerate(unique_dates):
