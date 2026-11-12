@@ -109,20 +109,26 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
-    /* Segmented Control / Button Group Styling */
+    /* Compact Unit Switcher Buttons (Like cam-btn style) */
     div[data-testid="stHorizontalBlock"] {{
         gap: 6px !important;
         margin-bottom: -5px;
+        justify-content: flex-end;
+    }}
+    div[data-testid="stHorizontalBlock"] > div {{
+        width: 65px !important;
+        flex: 0 0 65px !important;
     }}
     div[data-testid="stButton"] button {{
         border-radius: 8px !important;
-        font-weight: 700 !important;
-        min-height: 32px !important;
-        padding: 2px 8px !important;
+        font-weight: 600 !important;
+        min-height: 28px !important;
+        height: 28px !important;
+        padding: 0px 4px !important;
         width: 100% !important;
     }}
     div[data-testid="stButton"] button p {{
-        font-size: 0.85rem !important;
+        font-size: 0.8rem !important;
     }}
 
     /* Surfline Style Table CSS with vertical dividers */
@@ -679,72 +685,46 @@ df_daylight = df[
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# Render Two Segmented Buttons for Units
-col_spacer, col_cm, col_ft = st.columns([4, 1, 1])
+# Render Two Compact Cam-style Buttons for Units (Right Aligned)
+col_spacer, col_cm, col_ft = st.columns([6, 1, 1])
+
+is_metric = (unit_sys == "metric")
+
+# Inject dynamic styling for active (cam-btn-dark style) vs inactive (cam-btn-light style)
+active_bg = text_color
+active_fg = bg_color
+inactive_bg = card_bg
+inactive_fg = text_color
+
+st.markdown(f"""
+<style>
+div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {{
+    background-color: {"" + active_bg + "" if is_metric else "" + inactive_bg + ""} !important;
+    border: 1px solid {text_color} !important;
+    color: {"" + active_fg + "" if is_metric else "" + inactive_fg + ""} !important;
+}}
+div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {{
+    color: {"" + active_fg + "" if is_metric else "" + inactive_fg + ""} !important;
+}}
+
+div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {{
+    background-color: {"" + active_bg + "" if not is_metric else "" + inactive_bg + ""} !important;
+    border: 1px solid {text_color} !important;
+    color: {"" + active_fg + "" if not is_metric else "" + inactive_fg + ""} !important;
+}}
+div[data-testid="stHorizontalBlock"] > div:nth-child(3) button p {{
+    color: {"" + active_fg + "" if not is_metric else "" + inactive_fg + ""} !important;
+}}
+</style>
+""", unsafe_allow_html=True)
 
 with col_cm:
-    is_metric = (unit_sys == "metric")
-    # Active button style vs Inactive button style injection via markdown or custom button styling
-    if is_metric:
-        st.markdown("""
-        <style>
-        div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
-            background-color: #1E3A8A !important;
-            border: 1px solid #1E3A8A !important;
-            color: #FFFFFF !important;
-        }
-        div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {
-            color: #FFFFFF !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <style>
-        div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {
-            background-color: """ + card_bg + """ !important;
-            border: 1px solid """ + border_color + """ !important;
-            color: """ + text_color + """ !important;
-        }
-        div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {
-            color: """ + text_color + """ !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
     if st.button("cm", use_container_width=True):
         if unit_sys != "metric":
             st.session_state.unit = "metric"
             st.rerun()
 
 with col_ft:
-    if not is_metric:
-        st.markdown("""
-        <style>
-        div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {
-            background-color: #1E3A8A !important;
-            border: 1px solid #1E3A8A !important;
-            color: #FFFFFF !important;
-        }
-        div[data-testid="stHorizontalBlock"] > div:nth-child(3) button p {
-            color: #FFFFFF !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <style>
-        div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {
-            background-color: """ + card_bg + """ !important;
-            border: 1px solid """ + border_color + """ !important;
-            color: """ + text_color + """ !important;
-        }
-        div[data-testid="stHorizontalBlock"] > div:nth-child(3) button p {
-            color: """ + text_color + """ !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
     if st.button("ft", use_container_width=True):
         if unit_sys != "imperial":
             st.session_state.unit = "imperial"
