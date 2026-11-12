@@ -4,10 +4,7 @@ import streamlit.components.v1 as components
 import requests
 import pandas as pd
 
-# Initialize Theme State (Default to Light)
-if "theme" not in st.session_state:
-    st.session_state.theme = "light"
-
+# Forced Light Mode configuration
 st.set_page_config(
     page_title="Surf & Wind Forecast", 
     page_icon="🌊", 
@@ -15,114 +12,100 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Dynamic Theme Colors
-is_dark = st.session_state.theme == "dark"
-
-bg_color = "#0F172A" if is_dark else "#F2EEE5"
-card_bg = "#1E293B" if is_dark else "#FFFFFF"
-text_color = "#F8FAFC" if is_dark else "#1A2B4C"
-sub_text = "#94A3B8" if is_dark else "#6B7280"
-border_color = "#334155" if is_dark else "#E5E7EB"
-chart_line = "#38BDF8" if is_dark else "#1A2B4C"
-chart_grad_top = "#38BDF8" if is_dark else "#8997A8"
-grid_color = "#334155" if is_dark else "#CBD5E1"
-db_cell_bg = "#0F172A" if is_dark else "#F9FAFB"
-
-# Coastal & Dynamic Theme CSS
+# Force Streamlit to render in Light Theme via CSS injection as well
 st.markdown(
-    f"""
+    """
     <style>
-    :root {{
-        color-scheme: {"dark" if is_dark else "light"} !important;
-    }}
+    /* Force Light Theme variables globally */
+    :root {
+        color-scheme: light !important;
+    }
     
-    .stApp, .stApp > header {{
-        background-color: {bg_color} !important;
-        color: {text_color} !important;
-    }}
-    .block-container {{
+    .stApp, .stApp > header {
+        background-color: #F2EEE5 !important;
+        color: #1A2B4C !important;
+    }
+    .block-container {
         padding: 0.5rem 1rem 80px 1rem !important;
-    }}
-    header[data-testid="stHeader"] {{display: none;}}
-    #MainMenu {{visibility: hidden;}}
-    footer {{visibility: hidden;}}
+    }
+    header[data-testid="stHeader"] {display: none;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
     
-    .stApp {{ overflow-x: clip !important; }}
+    .stApp { overflow-x: clip !important; }
     [data-testid="stMainBlockContainer"], .block-container,
-    [data-testid="stVerticalBlock"], [data-testid="stElementContainer"] {{
+    [data-testid="stVerticalBlock"], [data-testid="stElementContainer"] {
         min-width: 0 !important;
         max-width: 100% !important;
-    }}
+    }
     
-    * {{
+    * {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        color: {text_color} !important;
-    }}
+        color: #1A2B4C !important;
+    }
     
-    .custom-header {{
+    .custom-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
         padding: 10px 0;
         margin-bottom: 5px;
     }
-    .hamburger {{ font-size: 24px; cursor: pointer; }}
-    .title-container {{ text-align: center; flex-grow: 1; }}
-    .main-title {{
-        font-size: 1.3rem; font-weight: 800;
+    .hamburger { font-size: 24px; color: #555; cursor: pointer; }
+    .title-container { text-align: center; flex-grow: 1; }
+    .main-title {
+        font-size: 1.3rem; font-weight: 800; color: #1A2B4C;
         display: flex; align-items: center; justify-content: center; gap: 6px;
-    }}
+    }
     
-    div[data-testid="stSelectbox"] {{ margin-top: -10px; margin-bottom: 10px; }}
-    div[data-testid="stSelectbox"] > div {{
-        background: {card_bg} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; box-shadow: none !important;
-    }}
-    div[data-testid="stSelectbox"] * {{
-        color: {text_color} !important; text-align: center !important; font-size: 0.95rem !important; font-weight: 600 !important;
-    }}
+    div[data-testid="stSelectbox"] { margin-top: -15px; margin-bottom: 10px; }
+    div[data-testid="stSelectbox"] > div {
+        background: #FFFFFF !important; border: 1px solid #D1D5DB !important; border-radius: 8px !important; box-shadow: none !important;
+    }
+    div[data-testid="stSelectbox"] * {
+        color: #1A2B4C !important; text-align: center !important; font-size: 0.95rem !important; font-weight: 600 !important;
+    }
     
-    .cam-buttons {{ display: flex; gap: 12px; margin-bottom: 16px; }}
-    .cam-btn-dark, .cam-btn-light {{
+    .cam-buttons { display: flex; gap: 12px; margin-bottom: 16px; }
+    .cam-btn-dark, .cam-btn-light {
         flex: 1; padding: 12px 10px; border-radius: 8px; text-align: center;
         text-decoration: none !important; font-size: 0.85rem; font-weight: 600;
         display: flex; align-items: center; justify-content: center; gap: 6px;
-    }}
-    .cam-btn-dark {{ background-color: {text_color}; color: {bg_color} !important; }}
-    .cam-btn-light {{ background-color: {card_bg}; border: 1px solid {text_color}; color: {text_color} !important; }}
+    }
+    .cam-btn-dark { background-color: #1A2B4C; color: #FFFFFF !important; }
+    .cam-btn-light { background-color: #FFFFFF; border: 1px solid #1A2B4C; color: #1A2B4C !important; }
     
-    .unified-stat-card {{
-        background: {card_bg}; border-radius: 16px; padding: 14px 10px;
+    .unified-stat-card {
+        background: #FFFFFF; border-radius: 16px; padding: 14px 10px;
         display: flex; justify-content: space-around; align-items: center;
         margin-bottom: 16px; box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-        border: 1px solid {border_color};
-    }}
-    .stat-col {{ text-align: center; flex: 1; }}
-    .stat-main {{ font-size: 1.15rem; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1.3; }}
-    .stat-sub {{ font-size: 0.75rem; font-weight: 600; color: {sub_text} !important; }}
+    }
+    .stat-col { text-align: center; flex: 1; }
+    .stat-main { font-size: 1.15rem; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1.3; }
+    .stat-sub { font-size: 0.75rem; font-weight: 600; color: #6B7280 !important; }
     
-    [data-testid="stDataFrame"] {{
-        background-color: {card_bg} !important;
+    [data-testid="stDataFrame"] {
+        background-color: #FFFFFF !important;
         border-radius: 12px !important;
         padding: 4px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.03);
         margin-bottom: 10px;
-        border: 1px solid {border_color};
-    }}
-    [data-testid="stDataFrame"] > div {{ border: none !important; }}
-    .day-header {{
-        font-size: 1.1rem; font-weight: 800;
+    }
+    [data-testid="stDataFrame"] > div { border: none !important; }
+    .day-header {
+        font-size: 1.1rem; font-weight: 800; color: #1A2B4C;
         margin-top: 20px; margin-bottom: 8px; padding-left: 10px;
-        border-left: 4px solid {text_color};
-    }}
+        border-left: 4px solid #1A2B4C;
+    }
     
-    .bottom-nav {{
+    .bottom-nav {
         position: fixed; bottom: 0; left: 0; right: 0; height: 75px;
-        background: {card_bg}; border-top: 1px solid {border_color};
+        background: #FFFFFF; border-top: 1px solid #E5E7EB;
         display: flex; justify-content: space-around; align-items: center;
         z-index: 9999; padding-bottom: env(safe-area-inset-bottom);
-    }}
-    .nav-icon {{ font-size: 24px; color: {sub_text}; }}
-    .nav-icon.active {{ color: {text_color}; }}
+    }
+    .nav-icon { font-size: 24px; color: #9CA3AF; }
+    .nav-icon.active { color: #1A2B4C; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -148,16 +131,7 @@ SPOTS = {
     "Haifa - Bat Galim": {"lat": 32.836, "lon": 34.978, "offshore": (130, 225), "onshore": (310, 45), "cam": "https://www.beachcam.co.il/batgalim.html"},
 }
 
-# Layout for Spot Selector and Theme Toggle
-col_spot, col_theme = st.columns([3, 1])
-with col_spot:
-    selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
-with col_theme:
-    new_theme = st.toggle("🌙 Dark", value=is_dark, key="theme_toggle")
-    if new_theme != is_dark:
-        st.session_state.theme = "dark" if new_theme else "light"
-        st.rerun()
-
+selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
 spot = SPOTS[selected_spot_name]
 short_spot_name = selected_spot_name.split(" (")[0].split(" - ")[-1]
 
@@ -266,7 +240,7 @@ def style_forecast_table(source_df, cols):
     def highlight_rating(row):
         s = scores.loc[row.name]
         _, text_hex, bg_rgba, _ = get_rating_tier(s)
-        rating_css = f"background-color: {bg_rgba}; color: {text_color}; font-weight: 700;"
+        rating_css = f"background-color: {bg_rgba}; color: #1A2B4C; font-weight: 700;"
         return [rating_css if col == "Rating" else "" for col in row.index]
     return display_df.style.apply(highlight_rating, axis=1)
 
@@ -322,7 +296,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart with dynamic theme colors
+# Smooth Wave Chart with multiple Y-axis labels and centered Day names at the top
 df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
 max_wave_m = float(df_chart["Wave Height (m)"].max())
 if pd.isna(max_wave_m) or max_wave_m <= 0: max_wave_m = 1.0
@@ -352,25 +326,25 @@ html_chart = f"""
 <style>
   * {{ box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }}
   body {{ margin: 0; font-family: -apple-system, sans-serif; background: transparent; }}
-  .chart-card {{ background: {card_bg}; border-radius: 16px; padding: 16px 8px 10px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); border: 1px solid {border_color}; }}
+  .chart-card {{ background: #FFFFFF; border-radius: 16px; padding: 16px 8px 10px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); }}
   .c-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 4px; }}
-  .c-title {{ font-size: 1.05rem; font-weight: 800; color: {text_color}; }}
-  .hint-badge {{ font-size: 11px; padding: 2px 8px; border-radius: 999px; background: {db_cell_bg}; color: {sub_text}; font-weight: 600; border: 1px solid {border_color}; }}
+  .c-title {{ font-size: 1.05rem; font-weight: 800; color: #1A2B4C; }}
+  .hint-badge {{ font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #F3F4F6; color: #6B7280; font-weight: 600; }}
   
-  .data-box {{ display: none; width: 100%; margin-bottom: 12px; background: {card_bg}; border: 1px solid {border_color}; border-radius: 12px; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }}
+  .data-box {{ display: none; width: 100%; margin-bottom: 12px; background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 12px; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }}
   .data-box.visible {{ display: block; }}
-  .db-header {{ display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; border-bottom: 1px solid {border_color}; padding-bottom: 6px; margin-bottom: 8px; color: {text_color}; }}
+  .db-header {{ display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; border-bottom: 1px solid #F3F4F6; padding-bottom: 6px; margin-bottom: 8px; color: #1A2B4C; }}
   .db-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }}
-  .db-cell {{ background: {db_cell_bg}; border-radius: 8px; padding: 6px 4px; border: 1px solid {border_color}; }}
-  .db-lbl {{ font-size: 10px; color: {sub_text}; margin-bottom: 2px; font-weight: 600;}}
-  .db-val {{ font-weight: 800; font-size: 12px; color: {text_color}; }}
-  .close-btn {{ cursor: pointer; padding: 0 4px; color: {text_color}; }}
+  .db-cell {{ background: #F9FAFB; border-radius: 8px; padding: 6px 4px; }}
+  .db-lbl {{ font-size: 10px; color: #6B7280; margin-bottom: 2px; font-weight: 600;}}
+  .db-val {{ font-weight: 800; font-size: 12px; color: #1A2B4C; }}
+  .close-btn {{ cursor: pointer; padding: 0 4px; }}
   
   .chart-shell {{ display: flex; position: relative; width: 100%; height: 185px; }}
   .y-axis {{
     width: 65px; flex-shrink: 0; display: flex; flex-direction: column;
     justify-content: space-between; padding: 15px 6px 35px 0; text-align: right;
-    font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1px solid {border_color};
+    font-size: 9px; font-weight: 600; color: #6B7280; border-right: 1px solid #F3F4F6;
   }}
   .scroll-area {{
     flex: 1; overflow-x: auto; overflow-y: hidden; touch-action: pan-x pan-y;
@@ -409,8 +383,8 @@ html_chart = f"""
     
     const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
     defs.innerHTML = `<linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="{chart_grad_top}" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="{card_bg}" stop-opacity="0.0"/>
+      <stop offset="0%" stop-color="#8997A8"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.2"/>
     </linearGradient>`;
     svg.appendChild(defs);
     
@@ -429,11 +403,11 @@ html_chart = f"""
         const x2 = i === coords.length ? svgWidth : (coords[i - 1].x + coords[i].x) / 2;
         
         if (bandStart > 0) {{
-          svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: padTop + plotHeight, stroke: "{grid_color}", "stroke-width": "1.5", "stroke-dasharray": "4,4" }}));
+          svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: padTop + plotHeight, stroke: "#CBD5E1", "stroke-width": "1.5", "stroke-dasharray": "4,4" }}));
         }}
         
         const midX = (x1 + x2) / 2;
-        const dayLabel = createSvg("text", {{ x: midX, y: padTop + 2, fill: "{text_color}", "font-size": "11", "font-weight": "800", "text-anchor": "middle" }});
+        const dayLabel = createSvg("text", {{ x: midX, y: padTop + 2, fill: "#1A2B4C", "font-size": "11", "font-weight": "800", "text-anchor": "middle" }});
         dayLabel.textContent = coords[bandStart].day;
         svg.appendChild(dayLabel);
         
@@ -452,19 +426,19 @@ html_chart = f"""
     
     const fillD = pathD + ` L ${{coords[coords.length-1].x}} ${{padTop + plotHeight}} L ${{coords[0].x}} ${{padTop + plotHeight}} Z`;
     svg.appendChild(createSvg("path", {{ d: fillD, fill: "url(#waveGrad)" }}));
-    svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "{chart_line}", "stroke-width": "3", "stroke-linecap": "round" }}));
+    svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "#1A2B4C", "stroke-width": "3", "stroke-linecap": "round" }}));
     
     coords.forEach(c => {{
       if (c.hour === 6 || c.hour === 12 || c.hour === 17) {{
-        svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "5", fill: "{card_bg}", stroke: c.ratingColor, "stroke-width": "2.5" }}));
-        const label = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "{sub_text}", "font-size": "10", "font-weight": "700", "text-anchor": "middle" }});
+        svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "5", fill: "#FFFFFF", stroke: c.ratingColor, "stroke-width": "2.5" }}));
+        const label = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "#4B5563", "font-size": "10", "font-weight": "700", "text-anchor": "middle" }});
         label.textContent = c.time.split(" ")[1];
         svg.appendChild(label);
       }}
     }});
     
-    const scrubLine = createSvg("line", {{x1: 0, y1: 0, x2: 0, y2: padTop + plotHeight, stroke: "{text_color}", "stroke-width": "1.5", "stroke-dasharray": "3,2", opacity: "0"}});
-    const activeDot = createSvg("circle", {{cx: 0, cy: 0, r: "5.5", fill: "{card_bg}", stroke: "{text_color}", "stroke-width": "2.5", opacity: "0"}});
+    const scrubLine = createSvg("line", {{x1: 0, y1: 0, x2: 0, y2: padTop + plotHeight, stroke: "#1A2B4C", "stroke-width": "1.5", "stroke-dasharray": "3,2", opacity: "0"}});
+    const activeDot = createSvg("circle", {{cx: 0, cy: 0, r: "5.5", fill: "#FFFFFF", stroke: "#1A2B4C", "stroke-width": "2.5", opacity: "0"}});
     svg.appendChild(scrubLine); svg.appendChild(activeDot);
     
     const scrollArea = document.getElementById("scrollArea"), dataBox = document.getElementById("dataBox"), chartCard = document.getElementById("chartCard");
