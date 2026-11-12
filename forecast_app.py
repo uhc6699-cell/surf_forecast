@@ -334,6 +334,7 @@ def render_touch_scrub_chart(df, max_wave):
         -webkit-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
       }}
       html, body {{
         margin: 0;
@@ -461,7 +462,9 @@ def render_touch_scrub_chart(df, max_wave):
         overflow-x: auto;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
         position: relative;
+        cursor: pointer;
       }}
       .scroll-area.scrubbing {{
         overflow-x: hidden !important;
@@ -583,7 +586,7 @@ def render_touch_scrub_chart(df, max_wave):
           svg.appendChild(createSvgEl("circle", {{
             cx: c.x,
             cy: c.y,
-            r: "3.2",
+            r: "3.4",
             fill: dotColor
           }}));
 
@@ -639,11 +642,11 @@ def render_touch_scrub_chart(df, max_wave):
         let selectedIdx = null;
         let isBoxVisible = false;
         let isScrubbing = false;
+        let ignoreNextClick = false;
         let longPressTimer = null;
         let stopTimer = null;
         let touchStartX = 0;
         let touchStartY = 0;
-        let movedBeforeLock = false;
 
         function syncIframeHeight() {{
           try {{
@@ -727,28 +730,43 @@ def render_touch_scrub_chart(df, max_wave):
           closeAllSelection();
         }});
 
-        // Touch handlers: short tap selects immediately, swipe scrolls, long-press drags bar
+        // Universal short tap / click handler (works reliably on Android, iOS, and Desktop)
+        scrollArea.addEventListener("click", (e) => {{
+          if (ignoreNextClick) {{
+            ignoreNextClick = false;
+            return;
+          }}
+          const idx = getNearestIndex(e.clientX);
+          if (isBoxVisible && idx === selectedIdx) {{
+            closeAllSelection();
+          }} else {{
+            moveCursorTo(idx);
+            showDataBox();
+          }}
+        }});
+
+        // Touch handlers for long-press scrub mode (while letting normal taps & swipes pass through)
         scrollArea.addEventListener("touchstart", (e) => {{
           if (e.touches.length !== 1) return;
           const t = e.touches[0];
           touchStartX = t.clientX;
           touchStartY = t.clientY;
-          movedBeforeLock = false;
 
           clearTimeout(longPressTimer);
           clearTimeout(stopTimer);
 
           longPressTimer = setTimeout(() => {{
             isScrubbing = true;
+            ignoreNextClick = true;
             scrollArea.classList.add("scrubbing");
             hintBadge.textContent = "Drag bar • Stop to view";
             hintBadge.classList.add("active");
-            if (navigator.vibrate) navigator.vibrate(20);
+            if (navigator.vibrate) navigator.vibrate(25);
 
             const idx = getNearestIndex(touchStartX);
             moveCursorTo(idx);
             hideDataBoxOnly();
-          }}, 240);
+          }}, 260);
         }}, {{ passive: true }});
 
         scrollArea.addEventListener("touchmove", (e) => {{
@@ -758,8 +776,7 @@ def render_touch_scrub_chart(df, max_wave):
           if (!isScrubbing) {{
             const dx = Math.abs(t.clientX - touchStartX);
             const dy = Math.abs(t.clientY - touchStartY);
-            if (dx > 14 || dy > 14) {{
-              movedBeforeLock = true;
+            if (dx > 10 || dy > 10) {{
               clearTimeout(longPressTimer);
             }}
             return;
@@ -776,10 +793,10 @@ def render_touch_scrub_chart(df, max_wave):
           clearTimeout(stopTimer);
           stopTimer = setTimeout(() => {{
             showDataBox();
-          }}, 200);
+          }}, 220);
         }}, {{ passive: false }});
 
-        function endTouch(e) {{
+        function endTouch() {{
           clearTimeout(longPressTimer);
           clearTimeout(stopTimer);
 
@@ -789,22 +806,14 @@ def render_touch_scrub_chart(df, max_wave):
             hintBadge.textContent = "Tap • Hold to drag";
             hintBadge.classList.remove("active");
             showDataBox();
-          }} else if (!movedBeforeLock && e.changedTouches && e.changedTouches.length > 0) {{
-            // Short tap selects point immediately (or closes if tapping same point again)
-            const idx = getNearestIndex(e.changedTouches[0].clientX);
-            if (isBoxVisible && idx === selectedIdx) {{
-              closeAllSelection();
-            }} else {{
-              moveCursorTo(idx);
-              showDataBox();
-            }}
+            setTimeout(() => {{ ignoreNextClick = false; }}, 350);
           }}
         }}
 
         scrollArea.addEventListener("touchend", endTouch, {{ passive: true }});
         scrollArea.addEventListener("touchcancel", endTouch, {{ passive: true }});
 
-        // Desktop mouse support
+        // Desktop mouse drag support
         let mouseDown = false;
         let mouseDragged = false;
         let mouseDownX = 0;
@@ -816,8 +825,9 @@ def render_touch_scrub_chart(df, max_wave):
         }});
         window.addEventListener("mousemove", (e) => {{
           if (!mouseDown) return;
-          if (Math.abs(e.clientX - mouseDownX) > 4) {{
+          if (Math.abs(e.clientX - mouseDownX) > 5) {{
             mouseDragged = true;
+            ignoreNextClick = true;
           }}
           if (!mouseDragged) return;
           const idx = getNearestIndex(e.clientX);
@@ -826,20 +836,13 @@ def render_touch_scrub_chart(df, max_wave):
           clearTimeout(stopTimer);
           stopTimer = setTimeout(() => showDataBox(), 180);
         }});
-        window.addEventListener("mouseup", (e) => {{
+        window.addEventListener("mouseup", () => {{
           if (!mouseDown) return;
           mouseDown = false;
           clearTimeout(stopTimer);
-          if (!mouseDragged) {{
-            const idx = getNearestIndex(e.clientX);
-            if (isBoxVisible && idx === selectedIdx) {{
-              closeAllSelection();
-            }} else {{
-              moveCursorTo(idx);
-              showDataBox();
-            }}
-          }} else {{
+          if (mouseDragged) {{
             showDataBox();
+            setTimeout(() => {{ ignoreNextClick = false; }}, 100);
           }}
         }});
 
