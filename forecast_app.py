@@ -151,7 +151,16 @@ def get_forecast_data(lat, lon):
         f"&hourly=wave_height,wave_period,swell_wave_height,sea_surface_temperature"
         f"&current=sea_surface_temperature&timezone=auto&forecast_days=7"
     )
-    wave_data = requests.get(marine_url).json()
+    # עצירת הבקשה אם השרת לא מגיב תוך 10 שניות
+    wave_data = requests.get(marine_url, timeout=10).json()
+
+    weather_url = (
+        f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+        f"&hourly=wind_speed_10m,wind_direction_10m"
+        f"&daily=sunrise,sunset&timezone=auto&forecast_days=7"
+    )
+    # גם כאן הוספנו מגבלת זמן
+    wind_data = requests.get(weather_url, timeout=10).json()
 
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
