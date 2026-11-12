@@ -22,15 +22,15 @@ def get_forecast_data():
     
     # Combine arrays into a clean DataFrame
     df = pd.DataFrame({
-        "Time": wave_data["hourly"]["time"],
+        "DateTime": pd.to_datetime(wave_data["hourly"]["time"]),
         "Wave Height (m)": wave_data["hourly"]["wave_height"],
         "Period (s)": wave_data["hourly"]["wave_period"],
         "Wind Speed (km/h)": wind_data["hourly"]["wind_speed_10m"],
         "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"]
     })
     
-    # Format date and time
-    df["Time"] = pd.to_datetime(df["Time"]).dt.strftime("%d/%m %H:00")
+    # Format date and time for display
+    df["Time"] = df["DateTime"].dt.strftime("%d/%m %H:00")
     return df
 
 def get_wind_type(direction):
@@ -48,7 +48,7 @@ df = get_forecast_data()
 df["Wind Type"] = df["Wind Direction (°)"].apply(get_wind_type)
 
 # Filter: Keep daylight hours only (06:00 to 18:00)
-df_daylight = df[pd.to_datetime(df["Time"], format="%d/%m %H:%M").dt.hour.between(6, 18)]
+df_daylight = df[df["DateTime"].dt.hour.between(6, 18)]
 
 # Find optimal surf windows
 best_conditions = df_daylight[
@@ -66,7 +66,7 @@ elif df_daylight["Wave Height (m)"].max() < 0.5:
 else:
     st.info("No ideal offshore windows in the next few days, but check the table below for light-wind sessions.")
 
-# Display static wave height chart locked to exact max peak
+# Display static wave height chart locked to exact max peak with clear hour ticks
 st.subheader("Wave Height Chart (24h)")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
@@ -74,14 +74,19 @@ if pd.isna(max_wave) or max_wave <= 0:
 
 chart = (
     alt.Chart(df)
-    .mark_line()
+    .mark_line(point=alt.OverlayMarkDef(size=35))
     .encode(
-        x=alt.X("Time:N", sort=None, title="Time", axis=alt.Axis(labelOverlap=True, labelAngle=-45)),
+        x=alt.X(
+            "DateTime:T",
+            title="Time",
+            axis=alt.Axis(format="%d/%m %H:%M", labelAngle=-45, tickCount=12),
+        ),
         y=alt.Y(
             "Wave Height (m):Q",
             scale=alt.Scale(domain=[0, max_wave]),
             title="Wave Height (m)",
         ),
+        tooltip=["Time", "Wave Height (m)", "Period (s)", "Wind Type", "Wind Speed (km/h)"],
     )
     .properties(height=300)
 )
