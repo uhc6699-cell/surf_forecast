@@ -205,6 +205,26 @@ def get_wetsuit_recommendation(temp):
         return f"{temp:.1f}°C", "4/3mm Suit 🥶"
 
 
+def format_height_with_unit(val):
+    if pd.isna(val):
+        return "-"
+    if val < 1.0:
+        return f"{int(round(val * 100))} cm"
+    return f"{round(val, 2):g} m"
+
+
+def format_period_with_unit(val):
+    if pd.isna(val):
+        return "-"
+    return f"{round(val, 1):g} s"
+
+
+def format_wind_with_unit(val):
+    if pd.isna(val):
+        return "-"
+    return f"{round(val, 1):g} km/h"
+
+
 def calculate_surf_rating(row, offshore_range, onshore_range):
     h = row["Wave Height (m)"]
     p = row["Period (s)"]
@@ -289,7 +309,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Classify wind and compute weighted surf rating
+# Classify wind, compute rating, and format display columns with units
 df["Wind Type"] = df["Wind Direction (°)"].apply(
     lambda d: get_wind_type(d, spot["offshore"], spot["onshore"])
 )
@@ -297,6 +317,10 @@ df["Score"] = df.apply(
     lambda r: calculate_surf_rating(r, spot["offshore"], spot["onshore"]), axis=1
 )
 df["Rating"] = df["Score"].apply(format_rating_badge)
+df["Wave Height"] = df["Wave Height (m)"].apply(format_height_with_unit)
+df["Swell"] = df["Swell (m)"].apply(format_height_with_unit)
+df["Period"] = df["Period (s)"].apply(format_period_with_unit)
+df["Wind Speed"] = df["Wind Speed (km/h)"].apply(format_wind_with_unit)
 
 # 4. Dynamic Daylight Filter
 df = df.merge(daily_df, on="Date", how="left")
@@ -314,7 +338,7 @@ if not best_conditions.empty:
         f"Prime windows spotted at {selected_spot_name}! Clean wall and favorable winds for pumping and rail carves:"
     )
     st.dataframe(
-        best_conditions[["Time", "Rating", "Wave Height (m)", "Period (s)", "Wind Type", "Wind Speed (km/h)"]],
+        best_conditions[["Time", "Rating", "Wave Height", "Period", "Wind Type", "Wind Speed"]],
         hide_index=True,
     )
 elif df_daylight["Wave Height (m)"].max() < 0.45:
@@ -351,7 +375,6 @@ line = base.mark_line().encode(
     )
 )
 
-# Invisible full-height vertical strips so tapping anywhere above/below the line shows the tooltip
 selectors = (
     base.mark_rule(strokeWidth=20)
     .encode(
@@ -359,22 +382,20 @@ selectors = (
         tooltip=[
             alt.Tooltip("Time:N", title="Time"),
             alt.Tooltip("Rating:N", title="Rating"),
-            alt.Tooltip("Wave Height (m):Q", title="Wave Height (m)"),
-            alt.Tooltip("Swell (m):Q", title="Swell (m)"),
-            alt.Tooltip("Period (s):Q", title="Period (s)"),
+            alt.Tooltip("Wave Height:N", title="Wave Height"),
+            alt.Tooltip("Swell:N", title="Swell"),
+            alt.Tooltip("Period:N", title="Period"),
             alt.Tooltip("Wind Type:N", title="Wind"),
-            alt.Tooltip("Wind Speed (km/h):Q", title="Wind Speed (km/h)"),
+            alt.Tooltip("Wind Speed:N", title="Wind Speed"),
         ],
     )
     .add_params(nearest)
 )
 
-# Vertical dashed crosshair on the selected hour
 rules = base.mark_rule(color="gray", strokeDash=[4, 4]).encode(
     opacity=alt.condition(nearest, alt.value(0.85), alt.value(0))
 )
 
-# Highlighted dot on the wave curve for the selected hour
 points = base.mark_circle(size=85, color="#00B4D8").encode(
     y=alt.Y("Wave Height (m):Q", scale=alt.Scale(domain=[0, max_wave])),
     opacity=alt.condition(nearest, alt.value(1), alt.value(0.35)),
@@ -387,6 +408,6 @@ st.altair_chart(chart, use_container_width=False)
 # 7. Full Daylight Forecast Table
 st.subheader("Full Daylight Forecast (Dawn to Dusk)")
 st.dataframe(
-    df_daylight[["Time", "Rating", "Wave Height (m)", "Swell (m)", "Period (s)", "Wind Type", "Wind Speed (km/h)"]],
+    df_daylight[["Time", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]],
     hide_index=True,
 )
