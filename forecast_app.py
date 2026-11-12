@@ -284,13 +284,15 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart with left Y-axis labels, day separators, and 6/12/17 hourly points
+# Smooth Wave Chart with multiple Y-axis labels and centered Day names at the top
 df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
 max_wave_m = float(df_chart["Wave Height (m)"].max())
 if pd.isna(max_wave_m) or max_wave_m <= 0: max_wave_m = 1.0
 
 y_top_label = format_height_with_unit(max_wave_m)
-y_mid_label = format_height_with_unit(max_wave_m / 2.0)
+y_three_q_label = format_height_with_unit(max_wave_m * 0.75)
+y_mid_label = format_height_with_unit(max_wave_m * 0.5)
+y_one_q_label = format_height_with_unit(max_wave_m * 0.25)
 
 points_data = []
 for _, row in df_chart.iterrows():
@@ -330,7 +332,7 @@ html_chart = f"""
   .y-axis {{
     width: 65px; flex-shrink: 0; display: flex; flex-direction: column;
     justify-content: space-between; padding: 15px 6px 35px 0; text-align: right;
-    font-size: 9.5px; font-weight: 600; color: #6B7280; border-right: 1px solid #F3F4F6;
+    font-size: 9px; font-weight: 600; color: #6B7280; border-right: 1px solid #F3F4F6;
   }}
   .scroll-area {{
     flex: 1; overflow-x: auto; overflow-y: hidden; touch-action: pan-x pan-y;
@@ -348,7 +350,9 @@ html_chart = f"""
     <div class="chart-shell">
       <div class="y-axis">
         <span>{y_top_label}</span>
+        <span>{y_three_q_label}</span>
         <span>{y_mid_label}</span>
+        <span>{y_one_q_label}</span>
         <span>0 cm</span>
       </div>
       <div class="scroll-area" id="scrollArea">
@@ -359,9 +363,9 @@ html_chart = f"""
   <script>
     const points = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
-    const stepX = 26, padLeft = 14, padRight = 20, padTop = 15, padBottom = 38;
+    const stepX = 28, padLeft = 14, padRight = 20, padTop = 18, padBottom = 38;
     const plotHeight = 185 - padTop - padBottom;
-    const svgWidth = Math.max(380, padLeft + padRight + (points.length - 1) * stepX);
+    const svgWidth = Math.max(400, padLeft + padRight + (points.length - 1) * stepX);
     const svg = document.getElementById("waveSvg");
     svg.setAttribute("width", svgWidth);
     
@@ -380,16 +384,20 @@ html_chart = f"""
     
     const coords = points.map((p, i) => ({{ ...p, x: padLeft + i * stepX, y: padTop + plotHeight * (1 - Math.min(1, Math.max(0, p.waveRaw / maxWave))) }}));
     
-    // Day separators + Day header name at top of each section
+    // Day separators + Centered Day Name at the top of each day section
     let bandStart = 0;
     for (let i = 1; i <= coords.length; i++) {{
       if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
         const x1 = bandStart === 0 ? 0 : (coords[bandStart - 1].x + coords[bandStart].x) / 2;
+        const x2 = i === coords.length ? svgWidth : (coords[i - 1].x + coords[i].x) / 2;
+        
         if (bandStart > 0) {{
           svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: padTop + plotHeight, stroke: "#CBD5E1", "stroke-width": "1.5", "stroke-dasharray": "4,4" }}));
         }}
-        // Add Day name label at the top of the day band
-        const dayLabel = createSvg("text", {{ x: x1 + 15, y: padTop + 10, fill: "#1A2B4C", "font-size": "11", "font-weight": "800" }});
+        
+        // Center the day name exactly in the middle of this day's section width
+        const midX = (x1 + x2) / 2;
+        const dayLabel = createSvg("text", {{ x: midX, y: padTop + 2, fill: "#1A2B4C", "font-size": "11", "font-weight": "800", "text-anchor": "middle" }});
         dayLabel.textContent = coords[bandStart].day;
         svg.appendChild(dayLabel);
         
