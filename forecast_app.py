@@ -2,73 +2,73 @@ import streamlit as st
 import requests
 import pandas as pd
 
-# קואורדינטות של קו החוף באזור המרכז
+# Central Israel coastline coordinates
 LATITUDE = 32.08
 LONGITUDE = 34.78
 
-st.set_page_config(page_title="תחזית גלים ורוח", layout="wide")
-st.title("🌊 תחזית גלים ורוח - 3 ימים קדימה")
+st.set_page_config(page_title="Surf & Wind Forecast", layout="wide")
+st.title("🌊 Surf & Wind Forecast - Next 3 Days")
 
 @st.cache_data
 def get_forecast_data():
-    # פנייה ל-API של הים למשיכת גובה גל וזמן מחזור
+    # Fetch hourly wave height and period from Marine API
     marine_url = f"https://marine-api.open-meteo.com/v1/marine?latitude={LATITUDE}&longitude={LONGITUDE}&hourly=wave_height,wave_period&timezone=auto&forecast_days=3"
     wave_data = requests.get(marine_url).json()
     
-    # פנייה ל-API של מזג האוויר למשיכת מהירות וכיוון רוח
+    # Fetch hourly wind speed and direction from Weather API
     weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={LATITUDE}&longitude={LONGITUDE}&hourly=wind_speed_10m,wind_direction_10m&timezone=auto&forecast_days=3"
     wind_data = requests.get(weather_url).json()
     
-    # איחוד הנתונים לטבלה מסודרת
+    # Combine arrays into a clean DataFrame
     df = pd.DataFrame({
-        "זמן": wave_data["hourly"]["time"],
-        "גובה גל (מ)": wave_data["hourly"]["wave_height"],
-        "זמן מחזור (שניות)": wave_data["hourly"]["wave_period"],
-        "מהירות רוח (קמש)": wind_data["hourly"]["wind_speed_10m"],
-        "כיוון רוח (מעלות)": wind_data["hourly"]["wind_direction_10m"]
+        "Time": wave_data["hourly"]["time"],
+        "Wave Height (m)": wave_data["hourly"]["wave_height"],
+        "Period (s)": wave_data["hourly"]["wave_period"],
+        "Wind Speed (km/h)": wind_data["hourly"]["wind_speed_10m"],
+        "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"]
     })
     
-    # עיצוב התאריך והשעה לפורמט קריא
-    df["זמן"] = pd.to_datetime(df["זמן"]).dt.strftime("%d/%m %H:00")
+    # Format date and time
+    df["Time"] = pd.to_datetime(df["Time"]).dt.strftime("%d/%m %H:00")
     return df
 
 def get_wind_type(direction):
     if pd.isna(direction):
         return ""
     if 45 <= direction <= 135:
-        return "אוף-שור 💨"
+        return "Offshore 💨"
     elif 225 <= direction <= 315:
-        return "און-שור 🌊"
+        return "Onshore 🌊"
     else:
-        return "קרוס-שור"
+        return "Cross-shore"
 
-# משיכת הנתונים והוספת עמודת סוג הרוח
+# Load data and classify wind direction
 df = get_forecast_data()
-df["סוג רוח"] = df["כיוון רוח (מעלות)"].apply(get_wind_type)
+df["Wind Type"] = df["Wind Direction (°)"].apply(get_wind_type)
 
-# סינון: השארת שעות האור בלבד (06:00 בבוקר עד 18:00 בערב)
-df_daylight = df[pd.to_datetime(df["זמן"], format="%d/%m %H:%M").dt.hour.between(6, 18)]
+# Filter: Keep daylight hours only (06:00 to 18:00)
+df_daylight = df[pd.to_datetime(df["Time"], format="%d/%m %H:%M").dt.hour.between(6, 18)]
 
-# חיפוש שעות עם תנאים אידיאליים
+# Find optimal surf windows
 best_conditions = df_daylight[
-    (df_daylight["גובה גל (מ)"] >= 0.7) & 
-    (df_daylight["זמן מחזור (שניות)"] >= 6) & 
-    (df_daylight["סוג רוח"] == "אוף-שור 💨")
+    (df_daylight["Wave Height (m)"] >= 0.7) & 
+    (df_daylight["Period (s)"] >= 6) & 
+    (df_daylight["Wind Type"] == "Offshore 💨")
 ]
 
-st.subheader("🏄 המלצות לסשן")
+st.subheader("🏄 Session Recommendations")
 if not best_conditions.empty:
-    st.success("נמצאו חלונות זמן קלאסיים! אוף-שור מחליק את המים ופותח את הקיר לפמפומים וקארבים. הנה השעות:")
-    st.dataframe(best_conditions[["זמן", "גובה גל (מ)", "זמן מחזור (שניות)", "מהירות רוח (קמש)"]], hide_index=True)
-elif df_daylight["גובה גל (מ)"].max() < 0.5:
-    st.warning("הים צפוי להיות פלטה בימים הקרובים. זמן טוב לאימון סרפסקיט ביבשה לשיפור מיקום הרגליים.")
+    st.success("Classic conditions found! Offshore winds are grooming the swell and opening up the wall for pumping and rail carves. Best windows:")
+    st.dataframe(best_conditions[["Time", "Wave Height (m)", "Period (s)", "Wind Speed (km/h)"]], hide_index=True)
+elif df_daylight["Wave Height (m)"].max() < 0.5:
+    st.warning("Looks flat over the next few days. Great time for a dry-land surfskate session to dial in your foot placement.")
 else:
-    st.info("אין תנאי אוף-שור מושלמים בימים הקרובים, אבל שווה לבדוק בטבלה מתי הרוח חלשה.")
+    st.info("No ideal offshore windows in the next few days, but check the table below for light-wind sessions.")
 
-# הצגת גרף גבהים
-st.subheader("גרף גובה גלים (כל היממה)")
-st.line_chart(df.set_index("זמן")["גובה גל (מ)"])
+# Display wave height chart
+st.subheader("Wave Height Chart (24h)")
+st.line_chart(df.set_index("Time")["Wave Height (m)"])
 
-# הצגת הטבלה המלאה לשעות האור
-st.subheader("התחזית המלאה (שעות אור)")
-st.dataframe(df_daylight[["זמן", "גובה גל (מ)", "זמן מחזור (שניות)", "סוג רוח", "מהירות רוח (קמש)"]], hide_index=True)
+# Display full daylight forecast table
+st.subheader("Full Forecast (Daylight Hours)")
+st.dataframe(df_daylight[["Time", "Wave Height (m)", "Period (s)", "Wind Type", "Wind Speed (km/h)"]], hide_index=True)
