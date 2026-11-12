@@ -109,26 +109,26 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
-    /* Compact Unit Switcher Buttons (Like cam-btn style) */
+    /* Compact Unit Switcher Buttons (Left / Right spread) */
     div[data-testid="stHorizontalBlock"] {{
-        gap: 6px !important;
+        gap: 0px !important;
         margin-bottom: -5px;
-        justify-content: flex-end;
+        justify-content: space-between !important;
     }}
     div[data-testid="stHorizontalBlock"] > div {{
-        width: 65px !important;
-        flex: 0 0 65px !important;
+        width: 55px !important;
+        flex: 0 0 55px !important;
     }}
     div[data-testid="stButton"] button {{
         border-radius: 8px !important;
         font-weight: 600 !important;
         min-height: 28px !important;
         height: 28px !important;
-        padding: 0px 4px !important;
+        padding: 0px 2px !important;
         width: 100% !important;
     }}
     div[data-testid="stButton"] button p {{
-        font-size: 0.8rem !important;
+        font-size: 0.75rem !important;
     }}
 
     /* Surfline Style Table CSS with vertical dividers */
@@ -685,12 +685,11 @@ df_daylight = df[
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# Render Two Compact Cam-style Buttons for Units (Right Aligned)
-col_spacer, col_cm, col_ft = st.columns([6, 1, 1])
+# Render Two Compact Cam-style Buttons (One on Left, One on Right)
+col_cm, col_spacer, col_ft = st.columns([1, 4, 1])
 
 is_metric = (unit_sys == "metric")
 
-# Inject dynamic styling for active (cam-btn-dark style) vs inactive (cam-btn-light style)
 active_bg = text_color
 active_fg = bg_color
 inactive_bg = card_bg
@@ -698,12 +697,12 @@ inactive_fg = text_color
 
 st.markdown(f"""
 <style>
-div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {{
+div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {{
     background-color: {"" + active_bg + "" if is_metric else "" + inactive_bg + ""} !important;
     border: 1px solid {text_color} !important;
     color: {"" + active_fg + "" if is_metric else "" + inactive_fg + ""} !important;
 }}
-div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {{
+div[data-testid="stHorizontalBlock"] > div:nth-child(1) button p {{
     color: {"" + active_fg + "" if is_metric else "" + inactive_fg + ""} !important;
 }}
 
