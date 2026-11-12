@@ -162,7 +162,7 @@ st.markdown(
     
     /* Clean up Streamlit Expander */
     [data-testid="stExpander"] {{ border: none !important; box-shadow: none !important; background: transparent !important; margin-top: 0px; margin-bottom: 20px; }}
-    [data-testid="stExpander"] summary {{ background: {db_cell_bg}; border-radius: 8px; border: 1px solid {border_color}; justify-content: center; padding: 10px; }}
+    [data-testid="stExpander"] summary {{ background: {db_cell_bg}; border-radius: 8px; border: 1px solid {border_color}; padding: 10px; }}
     [data-testid="stExpander"] summary p {{ font-weight: 700; color: {text_color}; font-size: 0.85rem; }}
     [data-testid="stExpander"] .streamlit-expanderContent {{ padding: 0 !important; margin-top: 4px; }}
     </style>
@@ -246,7 +246,6 @@ def get_forecast_data(lat, lon):
         "Sunset": pd.to_datetime(wind_data["daily"]["sunset"]),
     })
     
-    # מיזוג הטבלאות למניעת שגיאת ה-KeyError
     df = df.merge(daily_df, on="Date", how="left")
 
     water_temp = wave_data.get("current", {}).get("sea_surface_temperature")
@@ -383,7 +382,7 @@ html_chart = f"""
     font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1px solid {border_color};
   }}
   .scroll-area {{
-    flex: 1; overflow-x: auto; overflow-y: hidden; touch-action: pan-y;
+    flex: 1; overflow-x: auto; overflow-y: hidden; touch-action: pan-x pan-y;
     position: relative; cursor: crosshair;
   }}
 </style>
@@ -500,30 +499,15 @@ html_chart = f"""
         scrubLine.setAttribute("opacity", "0"); activeDot.setAttribute("opacity", "0"); 
     }};
 
-    // Cleaned up touch logic for butter smooth drag
-    let startX = 0, startY = 0, isScrubbing = false;
-
-    scrollArea.addEventListener("touchstart", (e) => {{
-        if(e.touches.length !== 1) return;
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        isScrubbing = false;
-    }}, {{passive: true}});
-
+    // Allow native scrolling without freezing
     scrollArea.addEventListener("touchmove", (e) => {{
         if(e.touches.length !== 1) return;
-        const dx = Math.abs(e.touches[0].clientX - startX);
-        const dy = Math.abs(e.touches[0].clientY - startY);
-        
-        // Prevent default only if moving horizontally to allow smooth scrub
-        if (dx > dy && dx > 5) {{
-            isScrubbing = true;
-            e.preventDefault(); 
-            const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
-            const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
+        const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
+        const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
+        if (selectedIdx !== idx) {{
             showData(idx);
         }}
-    }}, {{passive: false}});
+    }}, {{passive: true}});
 
     scrollArea.addEventListener("click", (e) => {{
         const relX = e.clientX - svg.getBoundingClientRect().left;
@@ -621,7 +605,7 @@ for i, d in enumerate(unique_dates):
         st.markdown(summary_html, unsafe_allow_html=True)
 
     # Hourly Expander
-    with st.expander("🔽 Show all daylight hours"):
+    with st.expander("Show all daylight hours"):
         hourly_html = f"""
         <div class="sf-table-container" style="box-shadow: none; border: none; margin-bottom: 0;">
             {generate_html_rows(day_dl_df)}
