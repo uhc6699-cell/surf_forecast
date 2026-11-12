@@ -160,7 +160,8 @@ def get_forecast_data(lat, lon):
         "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"],
     })
     df["Date"] = df["DateTime"].dt.date
-    df["Time"] = df["DateTime"].dt.strftime("%d/%m %H:00")
+    # Format as day name + hour (e.g., Thu 14:00)
+    df["Time"] = df["DateTime"].dt.strftime("%a %H:00")
 
     daily_df = pd.DataFrame({
         "Date": pd.to_datetime(wind_data["daily"]["time"]).date,
@@ -346,7 +347,7 @@ elif df_daylight["Wave Height (m)"].max() < 0.45:
 else:
     st.info("No high-scoring sessions yet, check the highest-rated daylight hours in the table below.")
 
-# 6. Horizontally scrollable wave height chart with full-height touch detection
+# 6. Horizontally scrollable wave height chart with day labels and full-height touch detection
 st.subheader("Wave Height Chart (Tap anywhere or swipe →)")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
@@ -362,8 +363,8 @@ nearest = alt.selection_point(
 base = alt.Chart(df).encode(
     x=alt.X(
         "DateTime:T",
-        title="Time",
-        axis=alt.Axis(format="%d/%m %H:%M", labelAngle=-45, tickCount=24),
+        title="Day & Time",
+        axis=alt.Axis(format="%a %H:%M", labelAngle=-45, tickCount=24),
     )
 )
 
