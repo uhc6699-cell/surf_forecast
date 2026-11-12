@@ -284,10 +284,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart (White dots with colored border)
+# Smooth Wave Chart with left Y-axis labels, day separators, and 6/12/17 hourly points
 df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
 max_wave_m = float(df_chart["Wave Height (m)"].max())
 if pd.isna(max_wave_m) or max_wave_m <= 0: max_wave_m = 1.0
+
+y_top_label = format_height_with_unit(max_wave_m)
+y_mid_label = format_height_with_unit(max_wave_m / 2.0)
 
 points_data = []
 for _, row in df_chart.iterrows():
@@ -309,7 +312,7 @@ html_chart = f"""
 <style>
   * {{ box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }}
   body {{ margin: 0; font-family: -apple-system, sans-serif; background: transparent; }}
-  .chart-card {{ background: #FFFFFF; border-radius: 16px; padding: 16px 12px 10px 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); }}
+  .chart-card {{ background: #FFFFFF; border-radius: 16px; padding: 16px 8px 10px 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.03); }}
   .c-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 4px; }}
   .c-title {{ font-size: 1.05rem; font-weight: 800; color: #1A2B4C; }}
   .hint-badge {{ font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #F3F4F6; color: #6B7280; font-weight: 600; }}
@@ -323,7 +326,16 @@ html_chart = f"""
   .db-val {{ font-weight: 800; font-size: 12px; color: #1A2B4C; }}
   .close-btn {{ cursor: pointer; padding: 0 4px; }}
   
-  .chart-shell {{ width: 100%; height: 180px; position: relative; overflow-x: auto; overflow-y: hidden; touch-action: pan-x pan-y; cursor: pointer; }}
+  .chart-shell {{ display: flex; position: relative; width: 100%; height: 185px; }}
+  .y-axis {{
+    width: 65px; flex-shrink: 0; display: flex; flex-direction: column;
+    justify-content: space-between; padding: 15px 6px 35px 0; text-align: right;
+    font-size: 9.5px; font-weight: 600; color: #6B7280; border-right: 1px solid #F3F4F6;
+  }}
+  .scroll-area {{
+    flex: 1; overflow-x: auto; overflow-y: hidden; touch-action: pan-x pan-y;
+    position: relative; cursor: pointer;
+  }}
 </style>
 </head>
 <body oncontextmenu="return false;">
@@ -333,16 +345,23 @@ html_chart = f"""
       <div class="hint-badge">Tap & Drag</div>
     </div>
     <div class="data-box" id="dataBox"></div>
-    <div class="chart-shell" id="scrollArea">
-      <svg id="waveSvg" height="180"></svg>
+    <div class="chart-shell">
+      <div class="y-axis">
+        <span>{y_top_label}</span>
+        <span>{y_mid_label}</span>
+        <span>0 cm</span>
+      </div>
+      <div class="scroll-area" id="scrollArea">
+        <svg id="waveSvg" height="185"></svg>
+      </div>
     </div>
   </div>
   <script>
     const points = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
-    const stepX = 26, padLeft = 14, padRight = 20, padTop = 15, padBottom = 35;
-    const plotHeight = 180 - padTop - padBottom;
-    const svgWidth = Math.max(350, padLeft + padRight + (points.length - 1) * stepX);
+    const stepX = 26, padLeft = 14, padRight = 20, padTop = 15, padBottom = 38;
+    const plotHeight = 185 - padTop - padBottom;
+    const svgWidth = Math.max(380, padLeft + padRight + (points.length - 1) * stepX);
     const svg = document.getElementById("waveSvg");
     svg.setAttribute("width", svgWidth);
     
@@ -361,11 +380,19 @@ html_chart = f"""
     
     const coords = points.map((p, i) => ({{ ...p, x: padLeft + i * stepX, y: padTop + plotHeight * (1 - Math.min(1, Math.max(0, p.waveRaw / maxWave))) }}));
     
+    // Day separators + Day header name at top of each section
     let bandStart = 0;
     for (let i = 1; i <= coords.length; i++) {{
       if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
         const x1 = bandStart === 0 ? 0 : (coords[bandStart - 1].x + coords[bandStart].x) / 2;
-        if (bandStart > 0) svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: padTop + plotHeight, stroke: "#E5E7EB", "stroke-width": "1.5", "stroke-dasharray": "3,3" }}));
+        if (bandStart > 0) {{
+          svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: padTop + plotHeight, stroke: "#CBD5E1", "stroke-width": "1.5", "stroke-dasharray": "4,4" }}));
+        }}
+        // Add Day name label at the top of the day band
+        const dayLabel = createSvg("text", {{ x: x1 + 15, y: padTop + 10, fill: "#1A2B4C", "font-size": "11", "font-weight": "800" }});
+        dayLabel.textContent = coords[bandStart].day;
+        svg.appendChild(dayLabel);
+        
         bandStart = i;
       }}
     }}
@@ -383,11 +410,11 @@ html_chart = f"""
     svg.appendChild(createSvg("path", {{ d: fillD, fill: "url(#waveGrad)" }}));
     svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "#1A2B4C", "stroke-width": "3", "stroke-linecap": "round" }}));
     
-    // Draw Key Dots (6, 12, 17) -> White fill with rating color border
+    // Draw Key Dots (6, 12, 17) with hours below them
     coords.forEach(c => {{
       if (c.hour === 6 || c.hour === 12 || c.hour === 17) {{
         svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "5", fill: "#FFFFFF", stroke: c.ratingColor, "stroke-width": "2.5" }}));
-        const label = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "#4B5563", "font-size": "10", "font-weight": "600", "text-anchor": "middle" }});
+        const label = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "#4B5563", "font-size": "10", "font-weight": "700", "text-anchor": "middle" }});
         label.textContent = c.time.split(" ")[1];
         svg.appendChild(label);
       }}
@@ -457,9 +484,9 @@ html_chart = f"""
 </body>
 </html>
 """
-components.html(html_chart, height=315)
+components.html(html_chart, height=325)
 
-# Forecast Dataframes (Fixed rename logic)
+# Daily Tables
 st.markdown('<div class="day-header" style="margin-top: 5px;">Daily Tables</div>', unsafe_allow_html=True)
 summary_cols = ["Session", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
 hourly_cols = ["HourStr", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
