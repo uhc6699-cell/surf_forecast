@@ -3,6 +3,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import requests
 import pandas as pd
+import datetime
 
 # Initialize Theme State (Default to Light)
 if "theme" not in st.session_state:
@@ -23,11 +24,8 @@ card_bg = "#1E293B" if is_dark else "#FFFFFF"
 text_color = "#F8FAFC" if is_dark else "#1A2B4C"
 sub_text = "#94A3B8" if is_dark else "#6B7280"
 border_color = "#334155" if is_dark else "#E5E7EB"
-
-# הוחזר לצבעים המקוריים עבור מצב בהיר
 chart_line = "#38BDF8" if is_dark else "#1A2B4C"
 chart_grad_top = "#38BDF8" if is_dark else "#8997A8"
-
 grid_color = "#334155" if is_dark else "#CBD5E1"
 db_cell_bg = "#0F172A" if is_dark else "#F9FAFB"
 
@@ -103,20 +101,55 @@ st.markdown(
     .stat-main {{ font-size: 1.15rem; font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; justify-content: center; gap: 4px; line-height: 1.3; }}
     .stat-sub {{ font-size: 0.75rem; font-weight: 600; color: {sub_text} !important; }}
     
-    [data-testid="stDataFrame"] {{
-        background-color: {card_bg} !important;
-        border-radius: 12px !important;
-        padding: 4px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
-        margin-bottom: 10px;
-        border: 1px solid {border_color};
-    }}
-    [data-testid="stDataFrame"] > div {{ border: none !important; }}
     .day-header {{
         font-size: 1.1rem; font-weight: 800;
-        margin-top: 20px; margin-bottom: 8px; padding-left: 10px;
+        margin-top: 24px; margin-bottom: 12px; padding-left: 10px;
         border-left: 4px solid {text_color};
     }}
+    
+    /* Surfline Style Table CSS */
+    .sf-table-container {{
+        background: {card_bg};
+        border-radius: 12px;
+        border: 1px solid {border_color};
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+    }}
+    .sf-header-row {{
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr 1.5fr 1fr;
+        padding-bottom: 8px;
+        border-bottom: 1px solid {border_color};
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: {sub_text};
+    }}
+    .sf-row {{
+        display: grid;
+        grid-template-columns: 0.8fr 1.2fr 1.5fr 1fr;
+        padding: 12px 0;
+        border-bottom: 1px solid {border_color};
+        align-items: center;
+        text-align: center;
+    }}
+    .sf-row:last-child {{ border-bottom: none; }}
+    
+    .sf-time {{ font-size: 0.8rem; font-weight: 600; color: {sub_text}; }}
+    .sf-val-main {{ font-size: 0.95rem; font-weight: 800; color: {text_color}; margin-bottom: 2px; }}
+    .sf-val-sub {{ font-size: 0.75rem; font-weight: 600; color: {text_color}; }}
+    
+    .rating-badge {{
+        display: inline-block; font-size: 0.65rem; font-weight: 800;
+        padding: 2px 6px; border-radius: 4px; margin-top: 2px; text-transform: uppercase;
+    }}
+    
+    .wind-arrow-container {{
+        display: flex; align-items: center; justify-content: center; gap: 4px;
+        font-size: 0.95rem; font-weight: 800; color: {text_color};
+    }}
+    .wind-arrow {{ display: inline-block; font-size: 1rem; }}
     
     .bottom-nav {{
         position: fixed; bottom: 0; left: 0; right: 0; height: 75px;
@@ -126,6 +159,12 @@ st.markdown(
     }}
     .nav-icon {{ font-size: 24px; color: {sub_text}; }}
     .nav-icon.active {{ color: {text_color}; }}
+    
+    /* Clean up Streamlit Expander */
+    [data-testid="stExpander"] {{ border: none !important; box-shadow: none !important; background: transparent !important; margin-top: -10px; }}
+    [data-testid="stExpander"] summary {{ background: {card_bg}; border-radius: 8px; border: 1px solid {border_color}; justify-content: center; }}
+    [data-testid="stExpander"] summary p {{ font-weight: 600; color: {text_color}; font-size: 0.85rem; }}
+    [data-testid="stExpander"] .streamlit-expanderContent {{ padding: 0 !important; margin-top: 4px; }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -151,7 +190,6 @@ SPOTS = {
     "Haifa - Bat Galim": {"lat": 32.836, "lon": 34.978, "offshore": (130, 225), "onshore": (310, 45), "cam": "https://www.beachcam.co.il/batgalim.html"},
 }
 
-# Layout for Spot Selector and Theme Toggle
 col_spot, col_theme = st.columns([3, 1])
 with col_spot:
     selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
@@ -199,7 +237,7 @@ def get_forecast_data(lat, lon):
     })
     df["Date"] = df["DateTime"].dt.date
     df["Day"] = df["DateTime"].dt.strftime("%a")
-    df["HourStr"] = df["DateTime"].dt.strftime("%H:00")
+    df["HourStr"] = df["DateTime"].dt.strftime("%H:%M")
     df["Time"] = df["DateTime"].dt.strftime("%a %H:00")
 
     daily_df = pd.DataFrame({
@@ -226,17 +264,6 @@ def is_angle_in_range(angle, start, end):
     if start <= end: return start <= angle <= end
     return angle >= start or angle <= end
 
-def get_wind_type(direction, offshore_range, onshore_range):
-    if pd.isna(direction): return ""
-    if is_angle_in_range(direction, *offshore_range): return "Offshore 💨"
-    elif is_angle_in_range(direction, *onshore_range): return "Onshore 🌊"
-    return "Cross-shore"
-
-def format_height_with_unit(val):
-    if pd.isna(val): return "-"
-    cm, ft = int(round(val * 100)), round(val * 3.28084, 1)
-    return f"{cm} cm / {ft} ft"
-
 def calculate_surf_rating(row, offshore_range, onshore_range):
     h, p = row["Wave Height (m)"], row["Period (s)"]
     ws, wd = row["Wind Speed (km/h)"], row["Wind Direction (°)"]
@@ -254,52 +281,19 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
 
     return min(10.0, max(5.0, round(height_score + period_score + wind_score, 1)))
 
-def get_rating_tier(score, is_dark_theme):
-    # Returns: (Chart Dot Color, Table Text Color, Table BG Color)
+def get_rating_details(score, is_dark_theme):
     if score >= 7.0: 
-        return "#48BB78", ("#4ADE80" if is_dark_theme else "#15803D"), "rgba(72, 187, 120, 0.2)"
-    elif score >= 4.0: 
-        return "#ECC94B", ("#FBBF24" if is_dark_theme else "#B45309"), "rgba(236, 201, 75, 0.25)"
-    return "#F56565", ("#F87171" if is_dark_theme else "#B91C1C"), "rgba(245, 101, 101, 0.2)"
-
-def format_rating_badge(score):
-    return f"{score}/10"
-
-def style_forecast_table(source_df, cols):
-    display_df = source_df[cols].copy()
-    scores = source_df["Score"]
-    def highlight_rating(row):
-        s = scores.loc[row.name]
-        _, text_hex, bg_rgba = get_rating_tier(s, is_dark)
-        rating_css = f"background-color: {bg_rgba}; color: {text_hex} !important; font-weight: 800;"
-        return [rating_css if col == "Rating" else "" for col in row.index]
-    return display_df.style.apply(highlight_rating, axis=1)
-
-def get_full_table_height(num_rows):
-    return (num_rows + 1) * 35 + 8
-
-def build_day_period_summary(day_df):
-    periods = [("🌅 Morning", 6, 10), ("☀️ Noon", 11, 14), ("🌇 Evening", 15, 19)]
-    summary_rows = []
-    for label, start_h, end_h in periods:
-        subset = day_df[day_df["DateTime"].dt.hour.between(start_h, end_h)]
-        if subset.empty: continue
-        best_idx = subset["Score"].idxmax()
-        rep_row = subset.loc[best_idx].copy()
-        rep_row["Session"] = label
-        summary_rows.append(rep_row)
-    return pd.DataFrame(summary_rows) if summary_rows else pd.DataFrame()
+        return "GOOD", ("#4ADE80" if is_dark_theme else "#15803D"), "rgba(72, 187, 120, 0.15)"
+    elif score >= 5.0: 
+        return "FAIR", ("#FBBF24" if is_dark_theme else "#B45309"), "rgba(236, 201, 75, 0.15)"
+    elif score >= 3.5:
+        return "POOR", ("#F87171" if is_dark_theme else "#B91C1C"), "rgba(245, 101, 101, 0.15)"
+    return "VERY POOR", ("#F87171" if is_dark_theme else "#B91C1C"), "rgba(245, 101, 101, 0.15)"
 
 df, daily_df, water_temp = get_forecast_data(spot["lat"], spot["lon"])
 unique_dates = sorted(df["Date"].unique())
 df["DayIdx"] = df["Date"].map({d: i for i, d in enumerate(unique_dates)})
-df["Wind Type"] = df["Wind Direction (°)"].apply(lambda d: get_wind_type(d, spot["offshore"], spot["onshore"]))
 df["Score"] = df.apply(lambda r: calculate_surf_rating(r, spot["offshore"], spot["onshore"]), axis=1)
-df["Rating"] = df["Score"].apply(format_rating_badge)
-df["Wave Height"] = df["Wave Height (m)"].apply(format_height_with_unit)
-df["Swell"] = df["Swell (m)"].apply(format_height_with_unit)
-df["Period"] = df["Period (s)"].apply(lambda p: f"{round(p, 1):g} s" if not pd.isna(p) else "-")
-df["Wind Speed"] = df["Wind Speed (km/h)"].apply(lambda s: f"{round(s, 1):g} km/h" if not pd.isna(s) else "-")
 
 # Stats Card in English
 temp_str = f"{water_temp:.1f}°C" if water_temp else "N/A"
@@ -327,25 +321,31 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart with dynamic theme colors
+# Smooth Wave Chart
 df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
 max_wave_m = float(df_chart["Wave Height (m)"].max())
 if pd.isna(max_wave_m) or max_wave_m <= 0: max_wave_m = 1.0
 
-y_top_label = format_height_with_unit(max_wave_m)
-y_three_q_label = format_height_with_unit(max_wave_m * 0.75)
-y_mid_label = format_height_with_unit(max_wave_m * 0.5)
-y_one_q_label = format_height_with_unit(max_wave_m * 0.25)
+def fmt_cm_ft(val):
+    if pd.isna(val): return "-"
+    cm, ft = int(round(val * 100)), round(val * 3.28084, 1)
+    return f"{cm} cm / {ft} ft"
+
+y_top = fmt_cm_ft(max_wave_m)
+y_3q = fmt_cm_ft(max_wave_m * 0.75)
+y_mid = fmt_cm_ft(max_wave_m * 0.5)
+y_1q = fmt_cm_ft(max_wave_m * 0.25)
 
 points_data = []
 for _, row in df_chart.iterrows():
     val = row["Wave Height (m)"]
-    chart_color, text_color, _ = get_rating_tier(row["Score"], is_dark)
+    _, hex_color, _ = get_rating_details(row["Score"], is_dark)
     points_data.append({
         "time": row["Time"], "day": row["Day"], "hour": int(row["DateTime"].hour),
-        "dayIdx": int(row["DayIdx"]), "ratingColor": chart_color, "rating": row["Rating"],
-        "wave": row["Wave Height"], "swell": row["Swell"], "period": row["Period"],
-        "windType": row["Wind Type"], "windSpeed": row["Wind Speed"],
+        "dayIdx": int(row["DayIdx"]), "ratingColor": hex_color, "rating": f"{row['Score']}/10",
+        "wave": fmt_cm_ft(val), "swell": fmt_cm_ft(row["Swell (m)"]), 
+        "period": f"{round(row['Period (s)'],1)}s" if not pd.isna(row["Period (s)"]) else "-",
+        "windSpeed": f"{round(row['Wind Speed (km/h)'],1)} km/h" if not pd.isna(row["Wind Speed (km/h)"]) else "-",
         "waveRaw": 0.0 if pd.isna(val) else float(val)
     })
 
@@ -365,7 +365,7 @@ html_chart = f"""
   .data-box {{ display: none; width: 100%; margin-bottom: 12px; background: {card_bg}; border: 1px solid {border_color}; border-radius: 12px; padding: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }}
   .data-box.visible {{ display: block; }}
   .db-header {{ display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; border-bottom: 1px solid {border_color}; padding-bottom: 6px; margin-bottom: 8px; color: {text_color}; }}
-  .db-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }}
+  .db-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; text-align: center; }}
   .db-cell {{ background: {db_cell_bg}; border-radius: 8px; padding: 6px 4px; border: 1px solid {border_color}; }}
   .db-lbl {{ font-size: 10px; color: {sub_text}; margin-bottom: 2px; font-weight: 600;}}
   .db-val {{ font-weight: 800; font-size: 12px; color: {text_color}; }}
@@ -392,11 +392,7 @@ html_chart = f"""
     <div class="data-box" id="dataBox"></div>
     <div class="chart-shell">
       <div class="y-axis">
-        <span>{y_top_label}</span>
-        <span>{y_three_q_label}</span>
-        <span>{y_mid_label}</span>
-        <span>{y_one_q_label}</span>
-        <span>0 cm</span>
+        <span>{y_top}</span><span>{y_3q}</span><span>{y_mid}</span><span>{y_1q}</span><span>0 cm</span>
       </div>
       <div class="scroll-area" id="scrollArea">
         <svg id="waveSvg" height="185"></svg>
@@ -475,17 +471,6 @@ html_chart = f"""
     const scrollArea = document.getElementById("scrollArea"), dataBox = document.getElementById("dataBox"), chartCard = document.getElementById("chartCard");
     let selectedIdx = null, isBoxVisible = false;
     
-    function syncHeight() {{ try {{ if (window.frameElement) window.frameElement.style.height = (chartCard.offsetHeight + 10) + "px"; }} catch(e){{}} }}
-    function getNearestIndex(clientX) {{
-      const relX = clientX - svg.getBoundingClientRect().left;
-      return Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
-    }}
-    
-    window.hideData = function() {{
-      isBoxVisible = false; dataBox.classList.remove("visible");
-      scrubLine.setAttribute("opacity", "0"); activeDot.setAttribute("opacity", "0"); syncHeight();
-    }};
-    
     function showData(idx) {{
       selectedIdx = idx; const c = coords[idx];
       scrubLine.setAttribute("x1", c.x); scrubLine.setAttribute("x2", c.x); scrubLine.setAttribute("opacity", "0.5");
@@ -493,83 +478,124 @@ html_chart = f"""
       
       dataBox.innerHTML = `
         <div class="db-header">
-            <span>${{c.time}}</span>
-            <span style="color:${{c.ratingColor}}">${{c.rating}}</span>
-            <span class="close-btn" onclick="hideData()">✕</span>
+            <span>${{c.time}}</span><span style="color:${{c.ratingColor}}">${{c.rating}}</span><span class="close-btn" onclick="hideData()">✕</span>
         </div>
         <div class="db-grid">
-            <div class="db-cell"><span class="db-lbl">Wave</span><span class="db-val">${{c.wave}}</span></div>
-            <div class="db-cell"><span class="db-lbl">Swell</span><span class="db-val">${{c.swell}}</span></div>
-            <div class="db-cell"><span class="db-lbl">Period</span><span class="db-val">${{c.period}}</span></div>
-            <div class="db-cell"><span class="db-lbl">Wind</span><span class="db-val">${{c.windType}}</span></div>
-            <div class="db-cell"><span class="db-lbl">Speed</span><span class="db-val">${{c.windSpeed}}</span></div>
+            <div class="db-cell"><span class="db-lbl">Wave</span><br><span class="db-val">${{c.wave}}</span></div>
+            <div class="db-cell"><span class="db-lbl">Wind</span><br><span class="db-val">${{c.windSpeed}}</span></div>
         </div>
       `;
-      isBoxVisible = true; dataBox.classList.add("visible"); syncHeight();
+      isBoxVisible = true; dataBox.classList.add("visible"); 
+      try {{ if (window.frameElement) window.frameElement.style.height = (chartCard.offsetHeight + 10) + "px"; }} catch(e){{}}
     }}
-    
+    window.hideData = function() {{ isBoxVisible = false; dataBox.classList.remove("visible"); scrubLine.setAttribute("opacity", "0"); activeDot.setAttribute("opacity", "0"); }};
     scrollArea.addEventListener("click", (e) => {{
-      const idx = getNearestIndex(e.clientX);
+      const relX = e.clientX - svg.getBoundingClientRect().left;
+      const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
       if (isBoxVisible && idx === selectedIdx) hideData(); else showData(idx);
     }});
-    
-    let isScrubbing = false, touchStartX = 0, longPressTimer = null;
-    scrollArea.addEventListener("touchstart", (e) => {{
-      if(e.touches.length!==1) return;
-      touchStartX = e.touches[0].clientX;
-      longPressTimer = setTimeout(() => {{ isScrubbing = true; if(navigator.vibrate) navigator.vibrate(20); showData(getNearestIndex(touchStartX)); }}, 250);
-    }}, {{passive:true}});
-    
-    scrollArea.addEventListener("touchmove", (e) => {{
-      if(e.touches.length!==1) return;
-      if(!isScrubbing) {{ if(Math.abs(e.touches[0].clientX - touchStartX) > 10) clearTimeout(longPressTimer); return; }}
-      e.preventDefault(); showData(getNearestIndex(e.touches[0].clientX));
-    }}, {{passive:false}});
-    
-    scrollArea.addEventListener("touchend", () => {{ clearTimeout(longPressTimer); isScrubbing = false; }}, {{passive:true}});
-    syncHeight();
   </script>
 </body>
 </html>
 """
 components.html(html_chart, height=325)
 
-# Daily Tables
-st.markdown('<div class="day-header" style="margin-top: 5px;">Daily Tables</div>', unsafe_allow_html=True)
-summary_cols = ["Session", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
-hourly_cols = ["HourStr", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
 
+# --- HTML Table Generation (Surfline Style) ---
+def generate_html_rows(day_df):
+    html = ""
+    for _, row in day_df.iterrows():
+        time_str = row["HourStr"]
+        
+        # Surf Info
+        wv_m = row["Wave Height (m)"]
+        surf_str = f"{wv_m:.1f}m" if not pd.isna(wv_m) else "Flat"
+        rt_txt, rt_col, rt_bg = get_rating_details(row["Score"], is_dark)
+        
+        # Swell Info
+        sw_m = row["Swell (m)"]
+        sw_p = row["Period (s)"]
+        swell_str = f"{sw_m:.1f}m <span class='sf-val-sub'>{sw_p:.0f}s</span>" if not pd.isna(sw_m) else "-"
+        
+        # Wind Info
+        w_spd = row["Wind Speed (km/h)"]
+        w_dir = row["Wind Direction (°)"]
+        wind_spd_str = f"{w_spd:.0f} <span class='sf-val-sub'>kph</span>" if not pd.isna(w_spd) else "-"
+        
+        # Wind Arrow logic (arrow points to where wind is going)
+        arrow_deg = w_dir if not pd.isna(w_dir) else 0
+
+        html += f"""
+        <div class="sf-row">
+            <div class="sf-time">{time_str}</div>
+            <div class="sf-col">
+                <div class="sf-val-main">{surf_str}</div>
+                <div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div>
+            </div>
+            <div class="sf-col sf-val-main">{swell_str}</div>
+            <div class="sf-col">
+                <div class="wind-arrow-container">
+                    <span class="sf-val-main">{wind_spd_str}</span>
+                    <span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span>
+                </div>
+            </div>
+        </div>
+        """
+    return html
+
+
+# Only look at daylight hours
 df_daylight = df[
     (df["DateTime"] >= (df["Sunrise"] - pd.Timedelta(minutes=30))) & 
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
+# Render Days
 for i, d in enumerate(unique_dates):
-    day_full_df = df[df["Date"] == d].copy()
     day_dl_df = df_daylight[df_daylight["Date"] == d].copy()
+    if day_dl_df.empty: continue
 
     day_ts = pd.Timestamp(d)
-    if i == 0: day_title = f"Today — {day_ts.strftime('%A (%d/%m)')}"
-    elif i == 1: day_title = f"Tomorrow — {day_ts.strftime('%A (%d/%m)')}"
-    else: day_title = day_ts.strftime("%A (%d/%m)")
+    if i == 0: day_title = f"Today, {day_ts.strftime('%m/%d')}"
+    elif i == 1: day_title = f"Tomorrow, {day_ts.strftime('%m/%d')}"
+    else: day_title = day_ts.strftime("%A, %m/%d")
 
     st.markdown(f'<div class="day-header">{day_title}</div>', unsafe_allow_html=True)
-
-    summary_df = build_day_period_summary(day_full_df)
+    
+    # Create Summary Data (Morning, Noon, Evening)
+    summary_hours = []
+    for label, target_h in [("Morning", 8), ("Noon", 13), ("Evening", 17)]:
+        subset = day_dl_df.iloc[(day_dl_df['DateTime'].dt.hour - target_h).abs().argsort()[:1]]
+        if not subset.empty:
+            row = subset.iloc[0].copy()
+            row["HourStr"] = label # Override time with label (e.g. 8:00 -> Morning)
+            summary_hours.append(row)
+    
+    summary_df = pd.DataFrame(summary_hours)
+    
+    # Render Summary Table
     if not summary_df.empty:
-        st.dataframe(
-            style_forecast_table(summary_df, summary_cols),
-            hide_index=True,
-            height=get_full_table_height(len(summary_df)),
-        )
+        summary_html = f"""
+        <div class="sf-table-container">
+            <div class="sf-header-row">
+                <div></div><div>Surf</div><div>Swell</div><div>Wind</div>
+            </div>
+            {generate_html_rows(summary_df)}
+        </div>
+        """
+        st.markdown(summary_html, unsafe_allow_html=True)
 
-    with st.expander(f"All Daylight Hours — {day_ts.strftime('%A')}"):
-        hourly_display_df = day_dl_df[hourly_cols].rename(columns={"HourStr": "Hour"})
-        st.dataframe(
-            style_forecast_table(hourly_display_df, ["Hour"] + summary_cols[1:]),
-            hide_index=True,
-            height=get_full_table_height(len(day_dl_df)),
-        )
+    # Hourly Expander
+    with st.expander("Show hourly daylight breakdown"):
+        hourly_html = f"""
+        <div class="sf-table-container" style="box-shadow: none; border: none; margin-bottom: 0;">
+            <div class="sf-header-row">
+                <div></div><div>Surf</div><div>Swell</div><div>Wind</div>
+            </div>
+            {generate_html_rows(day_dl_df)}
+        </div>
+        """
+        st.markdown(hourly_html, unsafe_allow_html=True)
 
 st.markdown(
     """
