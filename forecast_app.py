@@ -292,6 +292,11 @@ def style_table_by_day(source_df, cols):
     return display_df.style.apply(highlight_row, axis=1)
 
 
+def get_full_table_height(num_rows):
+    # 35px per data row + 38px header + 6px buffer so vertical scrollbar never appears
+    return (num_rows + 1) * 35 + 8
+
+
 def render_touch_scrub_chart(df, max_wave):
     points_data = []
     for _, row in df.iterrows():
@@ -910,7 +915,7 @@ df_daylight = df[
     & (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# 5. Session Recommendations (color-coded by day)
+# 5. Session Recommendations (color-coded by day, full height)
 best_conditions = df_daylight[df_daylight["Score"] >= 6.8]
 
 st.subheader("🏄 Session Recommendations")
@@ -919,7 +924,11 @@ if not best_conditions.empty:
         f"Prime windows spotted at {selected_spot_name}! Clean wall and favorable winds for pumping and rail carves:"
     )
     rec_cols = ["Time", "Rating", "Wave Height", "Period", "Wind Type", "Wind Speed"]
-    st.dataframe(style_table_by_day(best_conditions, rec_cols), hide_index=True)
+    st.dataframe(
+        style_table_by_day(best_conditions, rec_cols),
+        hide_index=True,
+        height=get_full_table_height(len(best_conditions)),
+    )
 elif df_daylight["Wave Height (m)"].max() < 0.45:
     st.warning("Flat spell ahead. Ideal time for a dry-land surfskate session to dial in foot placement and carving mechanics.")
 else:
@@ -933,7 +942,11 @@ if pd.isna(max_wave) or max_wave <= 0:
 
 render_touch_scrub_chart(df, max_wave)
 
-# 7. Full Daylight Forecast Table (color-coded by day)
+# 7. Full Daylight Forecast Table (color-coded by day, fully expanded vertically)
 st.subheader("Full Daylight Forecast (Dawn to Dusk)")
 full_cols = ["Time", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
-st.dataframe(style_table_by_day(df_daylight, full_cols), hide_index=True)
+st.dataframe(
+    style_table_by_day(df_daylight, full_cols),
+    hide_index=True,
+    height=get_full_table_height(len(df_daylight)),
+)
