@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import altair as alt
 
 # Central Israel coastline coordinates
 LATITUDE = 32.08
@@ -65,9 +66,27 @@ elif df_daylight["Wave Height (m)"].max() < 0.5:
 else:
     st.info("No ideal offshore windows in the next few days, but check the table below for light-wind sessions.")
 
-# Display wave height chart
+# Display static wave height chart locked to exact max peak
 st.subheader("Wave Height Chart (24h)")
-st.line_chart(df.set_index("Time")["Wave Height (m)"])
+max_wave = float(df["Wave Height (m)"].max())
+if pd.isna(max_wave) or max_wave <= 0:
+    max_wave = 1.0
+
+chart = (
+    alt.Chart(df)
+    .mark_line()
+    .encode(
+        x=alt.X("Time:N", sort=None, title="Time", axis=alt.Axis(labelOverlap=True, labelAngle=-45)),
+        y=alt.Y(
+            "Wave Height (m):Q",
+            scale=alt.Scale(domain=[0, max_wave]),
+            title="Wave Height (m)",
+        ),
+    )
+    .properties(height=300)
+)
+
+st.altair_chart(chart, use_container_width=True)
 
 # Display full daylight forecast table
 st.subheader("Full Forecast (Daylight Hours)")
