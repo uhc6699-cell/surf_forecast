@@ -59,17 +59,29 @@ st.markdown(
         margin-top: 3px;
         opacity: 0.9;
     }
+    .day-header {
+        margin-top: 14px;
+        margin-bottom: 6px;
+        padding: 6px 10px;
+        border-radius: 8px;
+        background-color: var(--secondary-background-color);
+        font-weight: 700;
+        font-size: 1.02rem;
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# Color palette per forecast day (Day 1 = Cyan, Day 2 = Emerald, Day 3 = Amber)
-DAY_HEX = ["#00B4D8", "#2ECC71", "#F39C12"]
-DAY_BG_RGBA = [
-    "rgba(0, 180, 216, 0.16)",
-    "rgba(46, 204, 113, 0.16)",
-    "rgba(243, 156, 18, 0.16)",
+# Distinct color palette for 7 forecast days in the chart
+DAY_HEX = [
+    "#00B4D8",  # Day 1 - Cyan
+    "#2ECC71",  # Day 2 - Emerald
+    "#F39C12",  # Day 3 - Amber
+    "#9B59B6",  # Day 4 - Purple
+    "#FF6B6B",  # Day 5 - Coral
+    "#1ABC9C",  # Day 6 - Teal
+    "#3498DB",  # Day 7 - Sky Blue
 ]
 
 # Surf spots database: coordinates, coastline wind angles, and local cam URL
@@ -118,7 +130,7 @@ SPOTS = {
     },
 }
 
-st.subheader("🌊 Surf & Wind Forecast")
+st.subheader("🌊 Surf & Wind Forecast (7 Days)")
 
 # 1. Spot Selector
 selected_spot_name = st.selectbox("📍 Select Surf Spot", list(SPOTS.keys()))
@@ -142,14 +154,14 @@ def get_forecast_data(lat, lon):
     marine_url = (
         f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}"
         f"&hourly=wave_height,wave_period,swell_wave_height,sea_surface_temperature"
-        f"&current=sea_surface_temperature&timezone=auto&forecast_days=3"
+        f"&current=sea_surface_temperature&timezone=auto&forecast_days=7"
     )
     wave_data = requests.get(marine_url).json()
 
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
         f"&hourly=wind_speed_10m,wind_direction_10m"
-        f"&daily=sunrise,sunset&timezone=auto&forecast_days=3"
+        f"&daily=sunrise,sunset&timezone=auto&forecast_days=7"
     )
     wind_data = requests.get(weather_url).json()
 
@@ -163,6 +175,7 @@ def get_forecast_data(lat, lon):
     })
     df["Date"] = df["DateTime"].dt.date
     df["Day"] = df["DateTime"].dt.strftime("%a")
+    df["HourStr"] = df["DateTime"].dt.strftime("%H:00")
     df["Time"] = df["DateTime"].dt.strftime("%a %H:00")
 
     daily_df = pd.DataFrame({
@@ -237,9 +250,9 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     if pd.isna(h) or h < 0.2:
         return 1.0
 
-    # If wave height is less than 60 cm (0.6m), rating is strictly below 5/10
+    # Wave height < 60 cm stays strictly below 5.0
     if h < 0.6:
-        return round(min(4.9, 1.5 + (h / 0.6) * 3.0), 1)
+        return round(min(4.9, 1.0 + (h / 0.6) * 3.5), 1)
 
     # 1. Wave height score (max 4.0 pts)
     if h < 0.7:
@@ -276,41 +289,72 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     return min(10.0, max(5.0, round(height_score + period_score + wind_score, 1)))
 
 
+def get_rating_tier(score):
+    # 3 equal tiers across 1.0 - 10.0 (3.0 pts per tier):
+    # Worst: 1.0 - 3.9 (Red) | Middle: 4.0 - 6.9 (Orange) | Best: 7.0 - 10.0 (Green)
+    if score >= 7.0:
+        return "green", "#2ECC71", "rgba(46, 204, 113, 0.26)", "🟢"
+    elif score >= 4.0:
+        return "orange", "#F39C12", "rgba(243, 156, 18, 0.26)", "🟠"
+    return "red", "#FF5252", "rgba(255, 82, 82, 0.26)", "🔴"
+
+
 def format_rating_badge(score):
-    if score >= 8.0:
-        return f"{score}/10 🔥"
-    elif score >= 6.5:
-        return f"{score}/10 ✅"
-    elif score >= 5.0:
-        return f"{score}/10 👌"
-    return f"{score}/10 💤"
+    _, _, _, dot = get_rating_tier(score)
+    return f"{score}/10 {dot}"
 
 
-def style_table_by_day(source_df, cols):
+def style_forecast_table(source_df, cols):
     display_df = source_df[cols].copy()
-    day_indices = source_df["DayIdx"]
+    scores = source_df["Score"]
 
-    def highlight_row(row):
-        idx = int(day_indices.loc[row.name]) % len(DAY_BG_RGBA)
-        return [f"background-color: {DAY_BG_RGBA[idx]}"] * len(row)
+    def highlight_rating(row):
+        s = scores.loc[row.name]
+        _, text_hex, bg_rgba, _ = get_rating_tier(s)
+        rating_css = f"background-color: {bg_rgba}; color: {text_hex}; font-weight: 700;"
+        return [rating_css if col == "Rating" else "" for col in row.index]
 
-    return display_df.style.apply(highlight_row, axis=1)
+    return display_df.style.apply(highlight_rating, axis=1)
 
 
 def get_full_table_height(num_rows):
     return (num_rows + 1) * 35 + 8
 
 
+def build_day_period_summary(day_df):
+    periods = [
+        ("🌅 Morning", 6, 10),
+        ("☀️ Noon", 11, 14),
+        ("🌇 Evening", 15, 19),
+    ]
+    summary_rows = []
+    for label, start_h, end_h in periods:
+        subset = day_df[day_df["DateTime"].dt.hour.between(start_h, end_h)]
+        if subset.empty:
+            continue
+        # Pick the best surf window inside that part of the day
+        best_idx = subset["Score"].idxmax()
+        rep_row = subset.loc[best_idx].copy()
+        rep_row["Session"] = label
+        summary_rows.append(rep_row)
+
+    if not summary_rows:
+        return pd.DataFrame()
+    return pd.DataFrame(summary_rows)
+
+
 def render_touch_scrub_chart(df, max_wave):
     points_data = []
     for _, row in df.iterrows():
         val = row["Wave Height (m)"]
+        _, r_hex, _, _ = get_rating_tier(row["Score"])
         points_data.append({
             "time": row["Time"],
             "day": row["Day"],
             "dayIdx": int(row["DayIdx"]),
             "hour": int(row["DateTime"].hour),
             "rating": row["Rating"],
+            "ratingColor": r_hex,
             "wave": row["Wave Height"],
             "waveRaw": 0.0 if pd.isna(val) else float(val),
             "swell": row["Swell"],
@@ -363,13 +407,16 @@ def render_touch_scrub_chart(df, max_wave):
         display: flex;
         justify-content: space-between;
         align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
         margin-bottom: 8px;
         padding: 0 4px;
-        font-size: 12px;
+        font-size: 11.5px;
       }}
       .legend {{
         display: flex;
-        gap: 10px;
+        flex-wrap: wrap;
+        gap: 8px;
         align-items: center;
       }}
       .legend-item {{
@@ -379,8 +426,8 @@ def render_touch_scrub_chart(df, max_wave):
         font-weight: 600;
       }}
       .legend-dot {{
-        width: 9px;
-        height: 9px;
+        width: 8px;
+        height: 8px;
         border-radius: 50%;
       }}
       .hint-badge {{
@@ -706,7 +753,7 @@ def render_touch_scrub_chart(df, max_wave):
           dataBox.innerHTML = `
             <div class="db-header">
               <span style="color:${{color}}">${{c.time}}</span>
-              <span>${{c.rating}}</span>
+              <span style="color:${{c.ratingColor}}">${{c.rating}}</span>
               <span class="db-close">✕</span>
             </div>
             <div class="db-grid">
@@ -903,8 +950,8 @@ df_daylight = df[
     & (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# 5. Session Recommendations
-best_conditions = df_daylight[df_daylight["Score"] >= 6.8]
+# 5. Session Recommendations (Top Green Tier >= 7.0)
+best_conditions = df_daylight[df_daylight["Score"] >= 7.0]
 
 st.subheader("🏄 Session Recommendations")
 if not best_conditions.empty:
@@ -913,28 +960,60 @@ if not best_conditions.empty:
     )
     rec_cols = ["Time", "Rating", "Wave Height", "Period", "Wind Type", "Wind Speed"]
     st.dataframe(
-        style_table_by_day(best_conditions, rec_cols),
+        style_forecast_table(best_conditions, rec_cols),
         hide_index=True,
         height=get_full_table_height(len(best_conditions)),
     )
 elif df_daylight["Wave Height (m)"].max() < 0.45:
     st.warning("Flat spell ahead. Ideal time for a dry-land surfskate session to dial in foot placement and carving mechanics.")
 else:
-    st.info("No high-scoring sessions yet, check the highest-rated daylight hours in the table below.")
+    st.info("No green-tier (7.0+) sessions this week — check the daily Morning / Noon / Evening breakdowns below.")
 
-# 6. Interactive Wave Height Chart
-st.subheader("Wave Height Chart")
+# 6. Interactive 7-Day Wave Height Chart
+st.subheader("Wave Height Chart (7 Days)")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
     max_wave = 1.0
 
 render_touch_scrub_chart(df, max_wave)
 
-# 7. Full Daylight Forecast Table
-st.subheader("Full Daylight Forecast (Dawn to Dusk)")
-full_cols = ["Time", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
-st.dataframe(
-    style_table_by_day(df_daylight, full_cols),
-    hide_index=True,
-    height=get_full_table_height(len(df_daylight)),
-)
+# 7. Per-Day Forecast Tables (Morning / Noon / Evening + Expandable Hourly Breakdown)
+st.subheader("Daily Forecast (Morning / Noon / Evening)")
+summary_cols = ["Session", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
+hourly_cols = ["HourStr", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
+
+for i, d in enumerate(unique_dates):
+    day_full_df = df[df["Date"] == d].copy()
+    day_dl_df = df_daylight[df_daylight["Date"] == d].copy()
+    day_color = DAY_HEX[i % len(DAY_HEX)]
+
+    day_ts = pd.Timestamp(d)
+    if i == 0:
+        day_title = f"Today — {day_ts.strftime('%A (%d/%m)')}"
+    elif i == 1:
+        day_title = f"Tomorrow — {day_ts.strftime('%A (%d/%m)')}"
+    else:
+        day_title = day_ts.strftime("%A (%d/%m)")
+
+    st.markdown(
+        f'<div class="day-header" style="border-left: 4px solid {day_color};">{day_title}</div>',
+        unsafe_allow_html=True,
+    )
+
+    summary_df = build_day_period_summary(day_full_df)
+    if not summary_df.empty:
+        st.dataframe(
+            style_forecast_table(summary_df, summary_cols),
+            hide_index=True,
+            height=get_full_table_height(len(summary_df)),
+        )
+
+    with st.expander(f"All Daylight Hours — {day_ts.strftime('%A')}"):
+        st.dataframe(
+            style_forecast_table(day_dl_df, hourly_cols).relabel_index(
+                ["Hour", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"],
+                axis=1,
+            ),
+            hide_index=True,
+            height=get_full_table_height(len(day_dl_df)),
+        )
