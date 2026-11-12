@@ -31,6 +31,11 @@ chart_grad_top = "#38BDF8" if is_dark else "#8997A8"
 grid_color = "#334155" if is_dark else "#CBD5E1"
 db_cell_bg = "#0F172A" if is_dark else "#F9FAFB"
 
+active_bg = text_color
+active_fg = bg_color
+inactive_bg = card_bg
+inactive_fg = text_color
+
 # Coastal & Dynamic Theme CSS
 st.markdown(
     f"""
@@ -109,16 +114,35 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
-    /* Compact Unit Switcher Buttons (Left / Right spread) */
+    /* Side-by-side Unit Switcher Styling (Left & Right) */
     div[data-testid="stHorizontalBlock"] {{
-        gap: 0px !important;
-        margin-bottom: -5px;
+        display: flex !important;
         justify-content: space-between !important;
+        align-items: center !important;
+        gap: 0px !important;
+        margin-bottom: 8px !important;
     }}
     div[data-testid="stHorizontalBlock"] > div {{
-        width: 55px !important;
-        flex: 0 0 55px !important;
+        width: 75px !important;
+        flex: 0 0 75px !important;
     }}
+    div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {{
+        background-color: {"" + active_bg + "" if st.session_state.unit == "metric" else "" + inactive_bg + ""} !important;
+        border: 1px solid {text_color} !important;
+        color: {"" + active_fg + "" if st.session_state.unit == "metric" else "" + inactive_fg + ""} !important;
+    }}
+    div[data-testid="stHorizontalBlock"] > div:nth-child(1) button p {{
+        color: {"" + active_fg + "" if st.session_state.unit == "metric" else "" + inactive_fg + ""} !important;
+    }}
+    div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {{
+        background-color: {"" + active_bg + "" if st.session_state.unit == "imperial" else "" + inactive_bg + ""} !important;
+        border: 1px solid {text_color} !important;
+        color: {"" + active_fg + "" if st.session_state.unit == "imperial" else "" + inactive_fg + ""} !important;
+    }}
+    div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {{
+        color: {"" + active_fg + "" if st.session_state.unit == "imperial" else "" + inactive_fg + ""} !important;
+    }}
+    
     div[data-testid="stButton"] button {{
         border-radius: 8px !important;
         font-weight: 600 !important;
@@ -128,7 +152,7 @@ st.markdown(
         width: 100% !important;
     }}
     div[data-testid="stButton"] button p {{
-        font-size: 0.75rem !important;
+        font-size: 0.8rem !important;
     }}
 
     /* Surfline Style Table CSS with vertical dividers */
@@ -225,14 +249,13 @@ SPOTS = {
     "Haifa - Bat Galim": {"lat": 32.836, "lon": 34.978, "offshore": (130, 225), "onshore": (310, 45), "cam": "https://www.beachcam.co.il/batgalim.html"},
 }
 
-col_spot, col_theme = st.columns([3, 1])
-with col_spot:
-    selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
-with col_theme:
-    new_theme = st.toggle("🌙 Dark", value=is_dark, key="theme_toggle")
-    if new_theme != is_dark:
-        st.session_state.theme = "dark" if new_theme else "light"
-        st.rerun()
+# Centered Spot Selector & Full-width Theme Toggle
+selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
+
+new_theme = st.toggle("🌙 Dark Mode", value=is_dark, key="theme_toggle")
+if new_theme != is_dark:
+    st.session_state.theme = "dark" if new_theme else "light"
+    st.rerun()
 
 spot = SPOTS[selected_spot_name]
 short_spot_name = selected_spot_name.split(" (")[0].split(" - ")[-1]
@@ -685,37 +708,8 @@ df_daylight = df[
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# Render Two Compact Cam-style Buttons (One on Left, One on Right)
-col_cm, col_spacer, col_ft = st.columns([1, 4, 1])
-
-is_metric = (unit_sys == "metric")
-
-active_bg = text_color
-active_fg = bg_color
-inactive_bg = card_bg
-inactive_fg = text_color
-
-st.markdown(f"""
-<style>
-div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {{
-    background-color: {"" + active_bg + "" if is_metric else "" + inactive_bg + ""} !important;
-    border: 1px solid {text_color} !important;
-    color: {"" + active_fg + "" if is_metric else "" + inactive_fg + ""} !important;
-}}
-div[data-testid="stHorizontalBlock"] > div:nth-child(1) button p {{
-    color: {"" + active_fg + "" if is_metric else "" + inactive_fg + ""} !important;
-}}
-
-div[data-testid="stHorizontalBlock"] > div:nth-child(3) button {{
-    background-color: {"" + active_bg + "" if not is_metric else "" + inactive_bg + ""} !important;
-    border: 1px solid {text_color} !important;
-    color: {"" + active_fg + "" if not is_metric else "" + inactive_fg + ""} !important;
-}}
-div[data-testid="stHorizontalBlock"] > div:nth-child(3) button p {{
-    color: {"" + active_fg + "" if not is_metric else "" + inactive_fg + ""} !important;
-}}
-</style>
-""", unsafe_allow_html=True)
+# Render Two Compact Unit Buttons (Left & Right spread)
+col_cm, col_ft = st.columns(2)
 
 with col_cm:
     if st.button("cm", use_container_width=True):
