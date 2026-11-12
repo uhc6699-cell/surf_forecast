@@ -6,10 +6,18 @@ import pandas as pd
 
 st.set_page_config(page_title="Surf & Wind Forecast", page_icon="🌊", layout="wide")
 
-# Prevent horizontal page overflow without locking vertical touch scrolling on mobile
+# Minimal Coastal Theme CSS Override
 st.markdown(
     """
     <style>
+    /* Force Light Coastal Background */
+    .stApp, .stApp > header {
+        background-color: #F7F5F0 !important;
+    }
+    .block-container {
+        padding-top: 2rem !important;
+    }
+    /* Prevent horizontal page overflow on mobile */
     .stApp {
         overflow-x: clip !important;
     }
@@ -18,71 +26,70 @@ st.markdown(
         min-width: 0 !important;
         max-width: 100% !important;
     }
+    h1, h2, h3, p, span {
+        color: #2C3E50 !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
     .compact-row {
         display: flex;
-        gap: 8px;
+        gap: 10px;
         width: 100%;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
+    }
+    /* Clean, white, flat cards */
+    .cam-btn, .stat-card, .day-header {
+        background-color: #FFFFFF !important;
+        border: 1px solid #E8E5DF !important;
+        border-radius: 12px !important;
+        color: #2C3E50 !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
     }
     .cam-btn {
         flex: 1;
         text-align: center;
-        padding: 9px 6px;
-        border-radius: 8px;
-        background-color: var(--secondary-background-color);
-        color: var(--text-color) !important;
+        padding: 10px 6px;
         text-decoration: none !important;
-        border: 1px solid rgba(128, 128, 128, 0.3);
         font-size: 0.85rem;
         font-weight: 600;
+        transition: 0.2s;
+    }
+    .cam-btn:active {
+        background-color: #F0F2F6 !important;
     }
     .stat-card {
         flex: 1;
-        padding: 8px 6px;
-        border-radius: 10px;
-        background-color: var(--secondary-background-color);
-        border: 1px solid rgba(128, 128, 128, 0.25);
+        padding: 10px 6px;
         text-align: center;
     }
     .stat-label {
-        font-size: 0.72rem;
-        opacity: 0.8;
+        font-size: 0.75rem;
+        color: #7F8C8D !important;
         margin-bottom: 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     .stat-value {
-        font-size: 1.15rem;
+        font-size: 1.2rem;
         font-weight: 700;
         line-height: 1.2;
     }
     .stat-sub {
         font-size: 0.7rem;
         margin-top: 3px;
-        opacity: 0.9;
+        color: #95A5A6 !important;
     }
     .day-header {
-        margin-top: 14px;
-        margin-bottom: 6px;
-        padding: 6px 10px;
-        border-radius: 8px;
-        background-color: var(--secondary-background-color);
+        margin-top: 18px;
+        margin-bottom: 8px;
+        padding: 8px 12px;
         font-weight: 700;
-        font-size: 1.02rem;
+        font-size: 1.05rem;
+        border-left: 5px solid #3498DB !important;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
-
-# Distinct color palette for 7 forecast days in the chart
-DAY_HEX = [
-    "#00B4D8",  # Day 1 - Cyan
-    "#2ECC71",  # Day 2 - Emerald
-    "#F39C12",  # Day 3 - Amber
-    "#9B59B6",  # Day 4 - Purple
-    "#FF6B6B",  # Day 5 - Coral
-    "#1ABC9C",  # Day 6 - Teal
-    "#3498DB",  # Day 7 - Sky Blue
-]
 
 # Surf spots database: coordinates, coastline wind angles, and local cam URL
 SPOTS = {
@@ -130,7 +137,7 @@ SPOTS = {
     },
 }
 
-st.subheader("🌊 Surf & Wind Forecast (7 Days)")
+st.subheader("🌊 Surf & Wind Forecast")
 
 # 1. Spot Selector
 selected_spot_name = st.selectbox("📍 Select Surf Spot", list(SPOTS.keys()))
@@ -250,11 +257,9 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     if pd.isna(h) or h < 0.2:
         return 1.0
 
-    # Wave height < 60 cm stays strictly below 5.0
     if h < 0.6:
         return round(min(4.9, 1.0 + (h / 0.6) * 3.5), 1)
 
-    # 1. Wave height score (max 4.0 pts)
     if h < 0.7:
         height_score = 2.4
     elif h < 1.0:
@@ -264,7 +269,6 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     else:
         height_score = 3.2
 
-    # 2. Wave period score (max 2.5 pts)
     if pd.isna(p) or p < 5.0:
         period_score = 0.5
     elif p < 6.5:
@@ -274,7 +278,6 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
     else:
         period_score = 2.5
 
-    # 3. Wind quality score (max 3.5 pts)
     if pd.isna(wd) or pd.isna(ws):
         wind_score = 1.5
     elif is_angle_in_range(wd, *offshore_range):
@@ -290,31 +293,16 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
 
 
 def get_rating_tier(score):
-    # 3 equal tiers across 1.0 - 10.0 (3.0 pts per tier):
-    # Worst: 1.0 - 3.9 (Red) | Middle: 4.0 - 6.9 (Orange) | Best: 7.0 - 10.0 (Green)
     if score >= 7.0:
-        return "green", "#2ECC71", "rgba(46, 204, 113, 0.26)", "🟢"
+        return "🟢"
     elif score >= 4.0:
-        return "orange", "#F39C12", "rgba(243, 156, 18, 0.26)", "🟠"
-    return "red", "#FF5252", "rgba(255, 82, 82, 0.26)", "🔴"
+        return "🟠"
+    return "🔴"
 
 
 def format_rating_badge(score):
-    _, _, _, dot = get_rating_tier(score)
+    dot = get_rating_tier(score)
     return f"{score}/10 {dot}"
-
-
-def style_forecast_table(source_df, cols):
-    display_df = source_df[cols].copy()
-    scores = source_df["Score"]
-
-    def highlight_rating(row):
-        s = scores.loc[row.name]
-        _, text_hex, bg_rgba, _ = get_rating_tier(s)
-        rating_css = f"background-color: {bg_rgba}; color: {text_hex}; font-weight: 700;"
-        return [rating_css if col == "Rating" else "" for col in row.index]
-
-    return display_df.style.apply(highlight_rating, axis=1)
 
 
 def get_full_table_height(num_rows):
@@ -346,14 +334,12 @@ def render_touch_scrub_chart(df, max_wave):
     points_data = []
     for _, row in df.iterrows():
         val = row["Wave Height (m)"]
-        _, r_hex, _, _ = get_rating_tier(row["Score"])
         points_data.append({
             "time": row["Time"],
             "day": row["Day"],
             "dayIdx": int(row["DayIdx"]),
             "hour": int(row["DateTime"].hour),
             "rating": row["Rating"],
-            "ratingColor": r_hex,
             "wave": row["Wave Height"],
             "waveRaw": 0.0 if pd.isna(val) else float(val),
             "swell": row["Swell"],
@@ -361,16 +347,6 @@ def render_touch_scrub_chart(df, max_wave):
             "windType": row["Wind Type"],
             "windSpeed": row["Wind Speed"],
         })
-
-    day_legends = []
-    seen_days = set()
-    for p in points_data:
-        if p["dayIdx"] not in seen_days:
-            seen_days.add(p["dayIdx"])
-            day_legends.append({
-                "day": p["day"],
-                "color": DAY_HEX[p["dayIdx"] % len(DAY_HEX)],
-            })
 
     y_top_label = format_height_with_unit(max_wave)
     y_mid_label = format_height_with_unit(max_wave / 2.0)
@@ -393,65 +369,47 @@ def render_touch_scrub_chart(df, max_wave):
         padding: 0;
         background: transparent;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        color: #F0F2F6;
+        color: #2C3E50;
         overflow: hidden;
       }}
+      /* Minimal Coastal Chart Styling */
       .chart-card {{
-        background: rgba(24, 28, 36, 0.92);
-        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: #FFFFFF;
+        border: 1px solid #E8E5DF;
         border-radius: 12px;
-        padding: 10px 8px 6px 8px;
+        padding: 12px 8px 8px 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
       }}
       .top-bar {{
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 6px;
+        justify-content: flex-end;
         margin-bottom: 8px;
         padding: 0 4px;
-        font-size: 11.5px;
-      }}
-      .legend {{
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: center;
-      }}
-      .legend-item {{
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        font-weight: 600;
-      }}
-      .legend-dot {{
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
       }}
       .hint-badge {{
         font-size: 11px;
-        padding: 2px 8px;
+        padding: 3px 10px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.08);
-        color: #B0BAC5;
+        background: #F7F5F0;
+        color: #7F8C8D;
         transition: all 0.15s ease;
       }}
       .hint-badge.active {{
-        background: rgba(0, 180, 216, 0.25);
-        color: #48CAE4;
+        background: #E8F4FD;
+        color: #3498DB;
         font-weight: 600;
       }}
       .data-box {{
         display: none;
         width: 100%;
-        margin-bottom: 8px;
-        background: rgba(15, 19, 26, 0.96);
-        border: 1.5px solid rgba(0, 180, 216, 0.7);
+        margin-bottom: 12px;
+        background: #FFFFFF;
+        border: 1px solid #E8E5DF;
         border-radius: 10px;
-        padding: 8px 10px;
+        padding: 10px 12px;
         font-size: 12px;
         cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.04);
       }}
       .data-box.visible {{
         display: block;
@@ -462,42 +420,43 @@ def render_touch_scrub_chart(df, max_wave):
         align-items: center;
         font-weight: 700;
         font-size: 13px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-        padding-bottom: 4px;
-        margin-bottom: 6px;
+        border-bottom: 1px solid #F0F2F6;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+        color: #2C3E50;
       }}
       .db-close {{
-        font-size: 12px;
-        color: #9AA5B1;
-        background: rgba(255, 255, 255, 0.08);
-        border-radius: 6px;
-        padding: 1px 7px;
+        font-size: 14px;
+        color: #BDC3C7;
       }}
       .db-grid {{
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 6px;
+        gap: 8px;
         text-align: center;
       }}
       .db-cell {{
-        background: rgba(255, 255, 255, 0.04);
+        background: #F9F8F6;
         border-radius: 6px;
-        padding: 4px 2px;
+        padding: 6px 4px;
       }}
       .db-lbl {{
         display: block;
         font-size: 10px;
-        color: #9AA5B1;
+        color: #7F8C8D;
+        text-transform: uppercase;
+        margin-bottom: 2px;
       }}
       .db-val {{
         font-weight: 700;
         font-size: 12px;
+        color: #2C3E50;
       }}
       .chart-shell {{
         display: flex;
         position: relative;
         width: 100%;
-        height: 290px;
+        height: 270px;
       }}
       .y-axis {{
         width: 65px;
@@ -508,8 +467,7 @@ def render_touch_scrub_chart(df, max_wave):
         padding: 16px 6px 46px 0;
         text-align: right;
         font-size: 9.5px;
-        color: #9AA5B1;
-        border-right: 1px solid rgba(255, 255, 255, 0.12);
+        color: #95A5A6;
       }}
       .scroll-area {{
         flex: 1;
@@ -519,6 +477,7 @@ def render_touch_scrub_chart(df, max_wave):
         touch-action: pan-x pan-y;
         position: relative;
         cursor: pointer;
+        border-left: 1px solid #F0F2F6;
       }}
       .scroll-area.scrubbing {{
         overflow-x: hidden !important;
@@ -529,12 +488,9 @@ def render_touch_scrub_chart(df, max_wave):
     <body oncontextmenu="return false;">
       <div class="chart-card" id="chartCard">
         <div class="top-bar">
-          <div class="legend" id="legend"></div>
           <div class="hint-badge" id="hintBadge">Tap • Hold to drag</div>
         </div>
-
         <div class="data-box" id="dataBox"></div>
-
         <div class="chart-shell">
           <div class="y-axis">
             <span>{y_top_label}</span>
@@ -542,32 +498,22 @@ def render_touch_scrub_chart(df, max_wave):
             <span>0 cm</span>
           </div>
           <div class="scroll-area" id="scrollArea">
-            <svg id="waveSvg" height="290"></svg>
+            <svg id="waveSvg" height="270"></svg>
           </div>
         </div>
       </div>
 
       <script>
         const points = {json.dumps(points_data)};
-        const dayLegends = {json.dumps(day_legends)};
         const maxWave = {max_wave};
-        const dayColors = {json.dumps(DAY_HEX)};
 
-        const legendEl = document.getElementById("legend");
-        dayLegends.forEach(item => {{
-          const div = document.createElement("div");
-          div.className = "legend-item";
-          div.innerHTML = `<span class="legend-dot" style="background:${{item.color}}"></span><span>${{item.day}}</span>`;
-          legendEl.appendChild(div);
-        }});
-
-        // Daytime hours only (06:00 to 17:00 = 12 points per day)
-        const stepX = 24;
+        // Minimal layout: 06:00 to 17:00
+        const stepX = 28;
         const padLeft = 18;
         const padRight = 22;
         const padTop = 18;
         const padBottom = 48;
-        const plotHeight = 290 - padTop - padBottom;
+        const plotHeight = 270 - padTop - padBottom;
         const svgWidth = Math.max(600, padLeft + padRight + (points.length - 1) * stepX);
 
         const svg = document.getElementById("waveSvg");
@@ -589,76 +535,72 @@ def render_touch_scrub_chart(df, max_wave):
           return {{ ...p, x, y, idx: i }};
         }});
 
-        // Day background bands + vertical separator between 17:00 and next day 06:00
+        // Draw clean vertical day separators instead of heavy background colors
         let bandStart = 0;
         for (let i = 1; i <= coords.length; i++) {{
           if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
             const x1 = bandStart === 0 ? 0 : (coords[bandStart - 1].x + coords[bandStart].x) / 2;
-            const x2 = i === coords.length ? svgWidth : (coords[i - 1].x + coords[i].x) / 2;
-            const color = dayColors[coords[bandStart].dayIdx % dayColors.length];
-            svg.appendChild(createSvgEl("rect", {{
-              x: x1,
-              y: padTop,
-              width: Math.max(0, x2 - x1),
-              height: plotHeight,
-              fill: color,
-              opacity: "0.13"
-            }}));
             if (bandStart > 0) {{
               svg.appendChild(createSvgEl("line", {{
                 x1: x1, y1: padTop, x2: x1, y2: padTop + plotHeight,
-                stroke: "rgba(255,255,255,0.22)",
-                "stroke-dasharray": "3,3"
+                stroke: "#E8E5DF",
+                "stroke-width": "1.5",
+                "stroke-dasharray": "4,4"
               }}));
             }}
             bandStart = i;
           }}
         }}
 
+        // Clean subtle grid lines
         [0, 0.5, 1].forEach(frac => {{
           const gy = padTop + plotHeight * (1 - frac);
           svg.appendChild(createSvgEl("line", {{
             x1: 0, y1: gy, x2: svgWidth, y2: gy,
-            stroke: "rgba(255,255,255,0.1)",
+            stroke: "rgba(0,0,0,0.04)",
             "stroke-dasharray": frac === 0 ? "none" : "3,3"
           }}));
         }});
 
+        // Minimal Wave Path (Navy Blue)
         if (coords.length > 0) {{
           const pathD = coords.map((c, idx) => `${{idx === 0 ? "M" : "L"}} ${{c.x}} ${{c.y}}`).join(" ");
           svg.appendChild(createSvgEl("path", {{
             d: pathD,
             fill: "none",
-            stroke: "#E0F7FA",
-            "stroke-width": "2.4",
+            stroke: "#2C3E50",
+            "stroke-width": "2.8",
             "stroke-linejoin": "round",
             "stroke-linecap": "round"
           }}));
         }}
 
-        // Show dots for all daytime hours (06:00-17:00), and X-axis labels at 06:00, 12:00, and 17:00
+        // Simple single-color dots for data points
+        const mainColor = "#3498DB";
         coords.forEach((c) => {{
-          const dotColor = dayColors[c.dayIdx % dayColors.length];
           const isKeyHour = (c.hour === 6 || c.hour === 12 || c.hour === 17);
           svg.appendChild(createSvgEl("circle", {{
             cx: c.x,
             cy: c.y,
-            r: isKeyHour ? "4.0" : "3.0",
-            fill: dotColor
+            r: isKeyHour ? "4.5" : "3.0",
+            fill: mainColor,
+            stroke: "#FFF",
+            "stroke-width": isKeyHour ? "1.5" : "0"
           }}));
 
           if (isKeyHour) {{
             svg.appendChild(createSvgEl("line", {{
-              x1: c.x, y1: padTop + plotHeight, x2: c.x, y2: padTop + plotHeight + 5,
-              stroke: "rgba(255,255,255,0.35)"
+              x1: c.x, y1: padTop + plotHeight, x2: c.x, y2: padTop + plotHeight + 6,
+              stroke: "#BDC3C7"
             }}));
             const label = createSvgEl("text", {{
               x: c.x,
-              y: padTop + plotHeight + 14,
-              fill: "#B0BAC5",
+              y: padTop + plotHeight + 16,
+              fill: "#7F8C8D",
               "font-size": "10",
+              "font-weight": "500",
               "text-anchor": "end",
-              transform: `rotate(-38 ${{c.x}} ${{padTop + plotHeight + 14}})`
+              transform: `rotate(-35 ${{c.x}} ${{padTop + plotHeight + 16}})`
             }});
             label.textContent = c.time;
             svg.appendChild(label);
@@ -667,7 +609,7 @@ def render_touch_scrub_chart(df, max_wave):
 
         const scrubLine = createSvgEl("line", {{
           x1: 0, y1: padTop, x2: 0, y2: padTop + plotHeight,
-          stroke: "#48CAE4",
+          stroke: "#3498DB",
           "stroke-width": "2",
           "stroke-dasharray": "4,3",
           opacity: "0"
@@ -676,7 +618,7 @@ def render_touch_scrub_chart(df, max_wave):
 
         const activeHalo = createSvgEl("circle", {{
           cx: 0, cy: 0, r: "11",
-          fill: "rgba(72, 202, 228, 0.25)",
+          fill: "rgba(52, 152, 219, 0.15)",
           opacity: "0"
         }});
         svg.appendChild(activeHalo);
@@ -684,7 +626,7 @@ def render_touch_scrub_chart(df, max_wave):
         const activeDot = createSvgEl("circle", {{
           cx: 0, cy: 0, r: "5.5",
           fill: "#FFFFFF",
-          stroke: "#00B4D8",
+          stroke: "#3498DB",
           "stroke-width": "2.5",
           opacity: "0"
         }});
@@ -722,11 +664,9 @@ def render_touch_scrub_chart(df, max_wave):
         function moveCursorTo(idx) {{
           selectedIdx = idx;
           const c = coords[idx];
-          const color = dayColors[c.dayIdx % dayColors.length];
           scrubLine.setAttribute("x1", c.x);
           scrubLine.setAttribute("x2", c.x);
-          scrubLine.setAttribute("stroke", color);
-          scrubLine.setAttribute("opacity", "0.95");
+          scrubLine.setAttribute("opacity", "0.8");
 
           activeHalo.setAttribute("cx", c.x);
           activeHalo.setAttribute("cy", c.y);
@@ -734,7 +674,6 @@ def render_touch_scrub_chart(df, max_wave):
 
           activeDot.setAttribute("cx", c.x);
           activeDot.setAttribute("cy", c.y);
-          activeDot.setAttribute("stroke", color);
           activeDot.setAttribute("opacity", "1");
         }}
 
@@ -757,13 +696,11 @@ def render_touch_scrub_chart(df, max_wave):
         function showDataBox() {{
           if (selectedIdx === null) return;
           const c = coords[selectedIdx];
-          const color = dayColors[c.dayIdx % dayColors.length];
 
-          dataBox.style.borderColor = color;
           dataBox.innerHTML = `
             <div class="db-header">
-              <span style="color:${{color}}">${{c.time}}</span>
-              <span style="color:${{c.ratingColor}}">${{c.rating}}</span>
+              <span>${{c.time}}</span>
+              <span>${{c.rating}}</span>
               <span class="db-close">✕</span>
             </div>
             <div class="db-grid">
@@ -902,7 +839,7 @@ def render_touch_scrub_chart(df, max_wave):
     </body>
     </html>
     """
-    components.html(html_code, height=455)
+    components.html(html_code, height=450)
 
 
 # Load spot forecast
@@ -969,18 +906,15 @@ if not best_conditions.empty:
         f"Prime windows spotted at {selected_spot_name}! Clean wall and favorable winds for pumping and rail carves:"
     )
     rec_cols = ["Time", "Rating", "Wave Height", "Period", "Wind Type", "Wind Speed"]
-    st.dataframe(
-        style_forecast_table(best_conditions, rec_cols),
-        hide_index=True,
-        height=get_full_table_height(len(best_conditions)),
-    )
+    # Clean, plain Streamlit dataframe without background colors
+    st.dataframe(best_conditions[rec_cols], hide_index=True, height=get_full_table_height(len(best_conditions)))
 elif df_daylight["Wave Height (m)"].max() < 0.45:
     st.warning("Flat spell ahead. Ideal time for a dry-land surfskate session to dial in foot placement and carving mechanics.")
 else:
     st.info("No green-tier (7.0+) sessions this week — check the daily Morning / Noon / Evening breakdowns below.")
 
 # 6. Interactive 7-Day Wave Height Chart (Daytime hours 06:00 - 17:00)
-st.subheader("Wave Height Chart (7 Days • 06:00–17:00)")
+st.subheader("Wave Height Chart (06:00–17:00)")
 df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
 max_wave = float(df_chart["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
@@ -989,14 +923,13 @@ if pd.isna(max_wave) or max_wave <= 0:
 render_touch_scrub_chart(df_chart, max_wave)
 
 # 7. Per-Day Forecast Tables (Morning / Noon / Evening + Expandable Hourly Breakdown)
-st.subheader("Daily Forecast (Morning / Noon / Evening)")
+st.subheader("Daily Forecast")
 summary_cols = ["Session", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
 hourly_cols = ["HourStr", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
 
 for i, d in enumerate(unique_dates):
     day_full_df = df[df["Date"] == d].copy()
     day_dl_df = df_daylight[df_daylight["Date"] == d].copy()
-    day_color = DAY_HEX[i % len(DAY_HEX)]
 
     day_ts = pd.Timestamp(d)
     if i == 0:
@@ -1006,25 +939,13 @@ for i, d in enumerate(unique_dates):
     else:
         day_title = day_ts.strftime("%A (%d/%m)")
 
-    st.markdown(
-        f'<div class="day-header" style="border-left: 4px solid {day_color};">{day_title}</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(f'<div class="day-header">{day_title}</div>', unsafe_allow_html=True)
 
     summary_df = build_day_period_summary(day_full_df)
     if not summary_df.empty:
-        st.dataframe(
-            style_forecast_table(summary_df, summary_cols),
-            hide_index=True,
-            height=get_full_table_height(len(summary_df)),
-        )
+        # Clean plain dataframe
+        st.dataframe(summary_df[summary_cols], hide_index=True, height=get_full_table_height(len(summary_df)))
 
     with st.expander(f"All Daylight Hours — {day_ts.strftime('%A')}"):
-        st.dataframe(
-            style_forecast_table(day_dl_df, hourly_cols).relabel_index(
-                ["Hour", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"],
-                axis=1,
-            ),
-            hide_index=True,
-            height=get_full_table_height(len(day_dl_df)),
-        )
+        clean_hourly_df = day_dl_df[hourly_cols].rename(columns={"HourStr": "Hour"})
+        st.dataframe(clean_hourly_df, hide_index=True, height=get_full_table_height(len(day_dl_df)))
