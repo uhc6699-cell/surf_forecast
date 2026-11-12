@@ -3,28 +3,23 @@ import streamlit as st
 import streamlit.components.v1 as components
 import requests
 import pandas as pd
-from datetime import datetime
 
 st.set_page_config(page_title="Surf & Wind Forecast", page_icon="🌊", layout="wide")
 
-# Minimal Coastal CSS exactly like the mockup, with added styling for Streamlit Dataframes
+# Minimal Coastal CSS
 st.markdown(
     """
     <style>
-    /* Background exactly like the mockup */
     .stApp, .stApp > header {
         background-color: #F2EEE5 !important;
     }
     .block-container {
         padding: 0.5rem 1rem 80px 1rem !important;
     }
-    
-    /* Hide Streamlit default UI elements */
     header[data-testid="stHeader"] {display: none;}
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     
-    /* Prevent horizontal page overflow on mobile */
     .stApp { overflow-x: clip !important; }
     [data-testid="stMainBlockContainer"], .block-container,
     [data-testid="stVerticalBlock"], [data-testid="stElementContainer"] {
@@ -32,13 +27,11 @@ st.markdown(
         max-width: 100% !important;
     }
     
-    /* Typography */
     * {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         color: #1A2B4C;
     }
     
-    /* Custom Header */
     .custom-header {
         display: flex;
         justify-content: space-between;
@@ -53,7 +46,6 @@ st.markdown(
         display: flex; align-items: center; justify-content: center; gap: 6px;
     }
     
-    /* Native selectbox override */
     div[data-testid="stSelectbox"] { margin-top: -15px; margin-bottom: 10px; }
     div[data-testid="stSelectbox"] > div {
         background: transparent !important; border: none !important; box-shadow: none !important;
@@ -62,7 +54,6 @@ st.markdown(
         color: #4B5563 !important; text-align: center !important; font-size: 0.95rem !important; font-weight: 600 !important;
     }
     
-    /* Cam Buttons */
     .cam-buttons { display: flex; gap: 12px; margin-bottom: 16px; }
     .cam-btn-dark, .cam-btn-light {
         flex: 1; padding: 12px 10px; border-radius: 8px; text-align: center;
@@ -72,7 +63,6 @@ st.markdown(
     .cam-btn-dark { background-color: #1A2B4C; color: #FFFFFF !important; }
     .cam-btn-light { background-color: transparent; border: 1px solid #1A2B4C; color: #1A2B4C !important; }
     
-    /* Unified Stats Card */
     .unified-stat-card {
         background: #FFFFFF; border-radius: 16px; padding: 18px 10px;
         display: flex; justify-content: space-around; align-items: center;
@@ -82,7 +72,6 @@ st.markdown(
     .stat-main { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 6px; }
     .stat-sub { font-size: 0.75rem; font-weight: 600; color: #6B7280 !important; }
     
-    /* Style the native Streamlit Dataframes to look like white cards */
     [data-testid="stDataFrame"] {
         background-color: #FFFFFF !important;
         border-radius: 12px !important;
@@ -97,7 +86,6 @@ st.markdown(
         border-left: 4px solid #1A2B4C;
     }
     
-    /* Bottom Nav */
     .bottom-nav {
         position: fixed; bottom: 0; left: 0; right: 0; height: 75px;
         background: #FFFFFF; border-top: 1px solid #E5E7EB;
@@ -135,7 +123,6 @@ selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="coll
 spot = SPOTS[selected_spot_name]
 short_spot_name = selected_spot_name.split(" (")[0].split(" - ")[-1]
 
-# Cams
 st.markdown(
     f"""
     <div class="cam-buttons">
@@ -297,7 +284,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart (with 06:00, 12:00, 17:00 interactive dots)
+# Smooth Wave Chart (White dots with colored border)
 df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
 max_wave_m = float(df_chart["Wave Height (m)"].max())
 if pd.isna(max_wave_m) or max_wave_m <= 0: max_wave_m = 1.0
@@ -374,7 +361,6 @@ html_chart = f"""
     
     const coords = points.map((p, i) => ({{ ...p, x: padLeft + i * stepX, y: padTop + plotHeight * (1 - Math.min(1, Math.max(0, p.waveRaw / maxWave))) }}));
     
-    // Day separators
     let bandStart = 0;
     for (let i = 1; i <= coords.length; i++) {{
       if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
@@ -384,7 +370,6 @@ html_chart = f"""
       }}
     }}
     
-    // Smooth Bezier Curve
     let pathD = "";
     coords.forEach((c, idx) => {{
         if (idx === 0) pathD += `M ${{c.x}} ${{c.y}}`;
@@ -398,17 +383,16 @@ html_chart = f"""
     svg.appendChild(createSvg("path", {{ d: fillD, fill: "url(#waveGrad)" }}));
     svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "#1A2B4C", "stroke-width": "3", "stroke-linecap": "round" }}));
     
-    // Draw Key Dots (6, 12, 17)
+    // Draw Key Dots (6, 12, 17) -> White fill with rating color border
     coords.forEach(c => {{
       if (c.hour === 6 || c.hour === 12 || c.hour === 17) {{
-        svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "4.5", fill: c.ratingColor, stroke: "#FFF", "stroke-width": "1.5" }}));
+        svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "5", fill: "#FFFFFF", stroke: c.ratingColor, "stroke-width": "2.5" }}));
         const label = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "#4B5563", "font-size": "10", "font-weight": "600", "text-anchor": "middle" }});
-        label.textContent = c.time.split(" ")[1]; // Gets "06:00"
+        label.textContent = c.time.split(" ")[1];
         svg.appendChild(label);
       }}
     }});
     
-    // Interactive Elements
     const scrubLine = createSvg("line", {{x1: 0, y1: 0, x2: 0, y2: padTop + plotHeight, stroke: "#1A2B4C", "stroke-width": "1.5", "stroke-dasharray": "3,2", opacity: "0"}});
     const activeDot = createSvg("circle", {{cx: 0, cy: 0, r: "5.5", fill: "#FFFFFF", stroke: "#1A2B4C", "stroke-width": "2.5", opacity: "0"}});
     svg.appendChild(scrubLine); svg.appendChild(activeDot);
@@ -475,12 +459,11 @@ html_chart = f"""
 """
 components.html(html_chart, height=315)
 
-# Forecast Dataframes (Table format, integrated into the new design)
+# Forecast Dataframes (Fixed rename logic)
 st.markdown('<div class="day-header" style="margin-top: 5px;">Daily Tables</div>', unsafe_allow_html=True)
 summary_cols = ["Session", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
 hourly_cols = ["HourStr", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
 
-# Daylight filter for the hourly tables
 df_daylight = df[
     (df["DateTime"] >= (df["Sunrise"] - pd.Timedelta(minutes=30))) & 
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
@@ -506,15 +489,13 @@ for i, d in enumerate(unique_dates):
         )
 
     with st.expander(f"All Daylight Hours — {day_ts.strftime('%A')}"):
+        hourly_display_df = day_dl_df[hourly_cols].rename(columns={"HourStr": "Hour"})
         st.dataframe(
-            style_forecast_table(day_dl_df, hourly_cols).relabel_index(
-                ["Hour", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"], axis=1
-            ),
+            style_forecast_table(hourly_display_df, ["Hour"] + summary_cols[1:]),
             hide_index=True,
             height=get_full_table_height(len(day_dl_df)),
         )
 
-# Bottom Nav Bar (Matches mockup)
 st.markdown(
     """
     <div class="bottom-nav">
