@@ -332,7 +332,6 @@ def build_day_period_summary(day_df):
         subset = day_df[day_df["DateTime"].dt.hour.between(start_h, end_h)]
         if subset.empty:
             continue
-        # Pick the best surf window inside that part of the day
         best_idx = subset["Score"].idxmax()
         rep_row = subset.loc[best_idx].copy()
         rep_row["Session"] = label
@@ -562,9 +561,10 @@ def render_touch_scrub_chart(df, max_wave):
           legendEl.appendChild(div);
         }});
 
-        const stepX = 22;
-        const padLeft = 14;
-        const padRight = 20;
+        // Daytime hours only (06:00 to 17:00 = 12 points per day)
+        const stepX = 24;
+        const padLeft = 18;
+        const padRight = 22;
         const padTop = 18;
         const padBottom = 48;
         const plotHeight = 290 - padTop - padBottom;
@@ -589,6 +589,7 @@ def render_touch_scrub_chart(df, max_wave):
           return {{ ...p, x, y, idx: i }};
         }});
 
+        // Day background bands + vertical separator between 17:00 and next day 06:00
         let bandStart = 0;
         for (let i = 1; i <= coords.length; i++) {{
           if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
@@ -603,6 +604,13 @@ def render_touch_scrub_chart(df, max_wave):
               fill: color,
               opacity: "0.13"
             }}));
+            if (bandStart > 0) {{
+              svg.appendChild(createSvgEl("line", {{
+                x1: x1, y1: padTop, x2: x1, y2: padTop + plotHeight,
+                stroke: "rgba(255,255,255,0.22)",
+                "stroke-dasharray": "3,3"
+              }}));
+            }}
             bandStart = i;
           }}
         }}
@@ -628,19 +636,21 @@ def render_touch_scrub_chart(df, max_wave):
           }}));
         }}
 
-        coords.forEach((c, idx) => {{
+        // Show dots for all daytime hours (06:00-17:00), and X-axis labels at 06:00, 12:00, and 17:00
+        coords.forEach((c) => {{
           const dotColor = dayColors[c.dayIdx % dayColors.length];
+          const isKeyHour = (c.hour === 6 || c.hour === 12 || c.hour === 17);
           svg.appendChild(createSvgEl("circle", {{
             cx: c.x,
             cy: c.y,
-            r: "3.4",
+            r: isKeyHour ? "4.0" : "3.0",
             fill: dotColor
           }}));
 
-          if (idx % 3 === 0) {{
+          if (isKeyHour) {{
             svg.appendChild(createSvgEl("line", {{
               x1: c.x, y1: padTop + plotHeight, x2: c.x, y2: padTop + plotHeight + 5,
-              stroke: "rgba(255,255,255,0.25)"
+              stroke: "rgba(255,255,255,0.35)"
             }}));
             const label = createSvgEl("text", {{
               x: c.x,
@@ -969,13 +979,14 @@ elif df_daylight["Wave Height (m)"].max() < 0.45:
 else:
     st.info("No green-tier (7.0+) sessions this week — check the daily Morning / Noon / Evening breakdowns below.")
 
-# 6. Interactive 7-Day Wave Height Chart
-st.subheader("Wave Height Chart (7 Days)")
-max_wave = float(df["Wave Height (m)"].max())
+# 6. Interactive 7-Day Wave Height Chart (Daytime hours 06:00 - 17:00)
+st.subheader("Wave Height Chart (7 Days • 06:00–17:00)")
+df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
+max_wave = float(df_chart["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
     max_wave = 1.0
 
-render_touch_scrub_chart(df, max_wave)
+render_touch_scrub_chart(df_chart, max_wave)
 
 # 7. Per-Day Forecast Tables (Morning / Noon / Evening + Expandable Hourly Breakdown)
 st.subheader("Daily Forecast (Morning / Noon / Evening)")
