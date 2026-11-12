@@ -258,7 +258,7 @@ df["Swell"] = df["Swell (m)"].apply(format_height_with_unit)
 df["Period"] = df["Period (s)"].apply(lambda p: f"{round(p, 1):g} s" if not pd.isna(p) else "-")
 df["Wind Speed"] = df["Wind Speed (km/h)"].apply(lambda s: f"{round(s, 1):g} km/h" if not pd.isna(s) else "-")
 
-# Stats Card in English
+# Stats Card
 temp_str = f"{water_temp:.1f}°C" if water_temp else "N/A"
 suit_icon, suit_text = get_wetsuit_icon_text(water_temp)
 today_sunrise = daily_df.iloc[0]["Sunrise"].strftime("%H:%M")
@@ -269,7 +269,7 @@ st.markdown(
     <div class="unified-stat-card">
         <div class="stat-col">
             <div class="stat-main">🌡️ {temp_str}</div>
-            <div class="stat-sub">Water Temp</div>
+            <div class="stat-sub">טמפרטורת מים</div>
         </div>
         <div class="stat-col">
             <div class="stat-main">{suit_icon}</div>
@@ -277,7 +277,7 @@ st.markdown(
         </div>
         <div class="stat-col">
             <div class="stat-main" style="font-size: 0.95rem; line-height: 1.4;">🌅 {today_sunrise}<br>🌇 {today_sunset}</div>
-            <div class="stat-sub">Sunrise / Sunset</div>
+            <div class="stat-sub">זריחה / שקיעה</div>
         </div>
     </div>
     """,
@@ -384,6 +384,7 @@ html_chart = f"""
     
     const coords = points.map((p, i) => ({{ ...p, x: padLeft + i * stepX, y: padTop + plotHeight * (1 - Math.min(1, Math.max(0, p.waveRaw / maxWave))) }}));
     
+    // Day separators + Centered Day Name at the top of each day section
     let bandStart = 0;
     for (let i = 1; i <= coords.length; i++) {{
       if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
@@ -416,6 +417,7 @@ html_chart = f"""
     svg.appendChild(createSvg("path", {{ d: fillD, fill: "url(#waveGrad)" }}));
     svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "#1A2B4C", "stroke-width": "3", "stroke-linecap": "round" }}));
     
+    // Draw Key Dots (6, 12, 17) with hours below them
     coords.forEach(c => {{
       if (c.hour === 6 || c.hour === 12 || c.hour === 17) {{
         svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "5", fill: "#FFFFFF", stroke: c.ratingColor, "stroke-width": "2.5" }}));
@@ -426,4 +428,116 @@ html_chart = f"""
     }});
     
     const scrubLine = createSvg("line", {{x1: 0, y1: 0, x2: 0, y2: padTop + plotHeight, stroke: "#1A2B4C", "stroke-width": "1.5", "stroke-dasharray": "3,2", opacity: "0"}});
-    const activeDot = createSvg("circle", {{cx: 0, cy: 0, r: "5.5
+    const activeDot = createSvg("circle", {{cx: 0, cy: 0, r: "5.5", fill: "#FFFFFF", stroke: "#1A2B4C", "stroke-width": "2.5", opacity: "0"}});
+    svg.appendChild(scrubLine); svg.appendChild(activeDot);
+    
+    const scrollArea = document.getElementById("scrollArea"), dataBox = document.getElementById("dataBox"), chartCard = document.getElementById("chartCard");
+    let selectedIdx = null, isBoxVisible = false;
+    
+    function syncHeight() {{ try {{ if (window.frameElement) window.frameElement.style.height = (chartCard.offsetHeight + 10) + "px"; }} catch(e){{}} }}
+    function getNearestIndex(clientX) {{
+      const relX = clientX - svg.getBoundingClientRect().left;
+      return Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
+    }}
+    
+    window.hideData = function() {{
+      isBoxVisible = false; dataBox.classList.remove("visible");
+      scrubLine.setAttribute("opacity", "0"); activeDot.setAttribute("opacity", "0"); syncHeight();
+    }};
+    
+    function showData(idx) {{
+      selectedIdx = idx; const c = coords[idx];
+      scrubLine.setAttribute("x1", c.x); scrubLine.setAttribute("x2", c.x); scrubLine.setAttribute("opacity", "0.5");
+      activeDot.setAttribute("cx", c.x); activeDot.setAttribute("cy", c.y); activeDot.setAttribute("opacity", "1");
+      
+      dataBox.innerHTML = `
+        <div class="db-header">
+            <span>${{c.time}}</span>
+            <span style="color:${{c.ratingColor}}">${{c.rating}}</span>
+            <span class="close-btn" onclick="hideData()">✕</span>
+        </div>
+        <div class="db-grid">
+            <div class="db-cell"><span class="db-lbl">Wave</span><span class="db-val">${{c.wave}}</span></div>
+            <div class="db-cell"><span class="db-lbl">Swell</span><span class="db-val">${{c.swell}}</span></div>
+            <div class="db-cell"><span class="db-lbl">Period</span><span class="db-val">${{c.period}}</span></div>
+            <div class="db-cell"><span class="db-lbl">Wind</span><span class="db-val">${{c.windType}}</span></div>
+            <div class="db-cell"><span class="db-lbl">Speed</span><span class="db-val">${{c.windSpeed}}</span></div>
+        </div>
+      `;
+      isBoxVisible = true; dataBox.classList.add("visible"); syncHeight();
+    }}
+    
+    scrollArea.addEventListener("click", (e) => {{
+      const idx = getNearestIndex(e.clientX);
+      if (isBoxVisible && idx === selectedIdx) hideData(); else showData(idx);
+    }});
+    
+    let isScrubbing = false, touchStartX = 0, longPressTimer = null;
+    scrollArea.addEventListener("touchstart", (e) => {{
+      if(e.touches.length!==1) return;
+      touchStartX = e.touches[0].clientX;
+      longPressTimer = setTimeout(() => {{ isScrubbing = true; if(navigator.vibrate) navigator.vibrate(20); showData(getNearestIndex(touchStartX)); }}, 250);
+    }}, {{passive:true}});
+    
+    scrollArea.addEventListener("touchmove", (e) => {{
+      if(e.touches.length!==1) return;
+      if(!isScrubbing) {{ if(Math.abs(e.touches[0].clientX - touchStartX) > 10) clearTimeout(longPressTimer); return; }}
+      e.preventDefault(); showData(getNearestIndex(e.touches[0].clientX));
+    }}, {{passive:false}});
+    
+    scrollArea.addEventListener("touchend", () => {{ clearTimeout(longPressTimer); isScrubbing = false; }}, {{passive:true}});
+    syncHeight();
+  </script>
+</body>
+</html>
+"""
+components.html(html_chart, height=325)
+
+# Daily Tables
+st.markdown('<div class="day-header" style="margin-top: 5px;">Daily Tables</div>', unsafe_allow_html=True)
+summary_cols = ["Session", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
+hourly_cols = ["HourStr", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
+
+df_daylight = df[
+    (df["DateTime"] >= (df["Sunrise"] - pd.Timedelta(minutes=30))) & 
+    (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
+].copy()
+
+for i, d in enumerate(unique_dates):
+    day_full_df = df[df["Date"] == d].copy()
+    day_dl_df = df_daylight[df_daylight["Date"] == d].copy()
+
+    day_ts = pd.Timestamp(d)
+    if i == 0: day_title = f"Today — {day_ts.strftime('%A (%d/%m)')}"
+    elif i == 1: day_title = f"Tomorrow — {day_ts.strftime('%A (%d/%m)')}"
+    else: day_title = day_ts.strftime("%A (%d/%m)")
+
+    st.markdown(f'<div class="day-header">{day_title}</div>', unsafe_allow_html=True)
+
+    summary_df = build_day_period_summary(day_full_df)
+    if not summary_df.empty:
+        st.dataframe(
+            style_forecast_table(summary_df, summary_cols),
+            hide_index=True,
+            height=get_full_table_height(len(summary_df)),
+        )
+
+    with st.expander(f"All Daylight Hours — {day_ts.strftime('%A')}"):
+        hourly_display_df = day_dl_df[hourly_cols].rename(columns={"HourStr": "Hour"})
+        st.dataframe(
+            style_forecast_table(hourly_display_df, ["Hour"] + summary_cols[1:]),
+            hide_index=True,
+            height=get_full_table_height(len(day_dl_df)),
+        )
+
+st.markdown(
+    """
+    <div class="bottom-nav">
+        <div class="nav-icon active">🏠</div>
+        <div class="nav-icon">🧭</div>
+        <div class="nav-icon">🔔</div>
+        <div class="nav-icon">⚙️</div>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
