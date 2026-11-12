@@ -1,7 +1,8 @@
+import json
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 import pandas as pd
-import altair as alt
 
 st.set_page_config(page_title="Surf & Wind Forecast", page_icon="🌊", layout="wide")
 
@@ -16,13 +17,6 @@ st.markdown(
     [data-testid="stVerticalBlock"], [data-testid="stElementContainer"] {
         min-width: 0 !important;
         max-width: 100% !important;
-    }
-    [data-testid="stVegaLiteChart"], [data-testid="stArrowVegaLiteChart"] {
-        width: 100% !important;
-        max-width: 100% !important;
-        overflow-x: auto !important;
-        overflow-y: hidden !important;
-        -webkit-overflow-scrolling: touch;
     }
     .compact-row {
         display: flex;
@@ -298,6 +292,508 @@ def style_table_by_day(source_df, cols):
     return display_df.style.apply(highlight_row, axis=1)
 
 
+def render_touch_scrub_chart(df, max_wave):
+    points_data = []
+    for _, row in df.iterrows():
+        val = row["Wave Height (m)"]
+        points_data.append({
+            "time": row["Time"],
+            "day": row["Day"],
+            "dayIdx": int(row["DayIdx"]),
+            "hour": int(row["DateTime"].hour),
+            "rating": row["Rating"],
+            "wave": row["Wave Height"],
+            "waveRaw": 0.0 if pd.isna(val) else float(val),
+            "swell": row["Swell"],
+            "period": row["Period"],
+            "windType": row["Wind Type"],
+            "windSpeed": row["Wind Speed"],
+        })
+
+    day_legends = []
+    seen_days = set()
+    for p in points_data:
+        if p["dayIdx"] not in seen_days:
+            seen_days.add(p["dayIdx"])
+            day_legends.append({
+                "day": p["day"],
+                "color": DAY_HEX[p["dayIdx"] % len(DAY_HEX)],
+            })
+
+    y_top_label = format_height_with_unit(max_wave)
+    y_mid_label = format_height_with_unit(max_wave / 2.0)
+
+    html_code = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+      * {{
+        box-sizing: border-box;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }}
+      html, body {{
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #F0F2F6;
+        overflow: hidden;
+      }}
+      .chart-card {{
+        background: rgba(24, 28, 36, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 10px 8px 6px 8px;
+      }}
+      .top-bar {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
+        padding: 0 4px;
+        font-size: 12px;
+      }}
+      .legend {{
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }}
+      .legend-item {{
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-weight: 600;
+      }}
+      .legend-dot {{
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }}
+      .hint-badge {{
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #B0BAC5;
+        transition: all 0.15s ease;
+      }}
+      .hint-badge.active {{
+        background: rgba(0, 180, 216, 0.25);
+        color: #48CAE4;
+        font-weight: 600;
+      }}
+      .chart-shell {{
+        display: flex;
+        position: relative;
+        width: 100%;
+        height: 295px;
+      }}
+      .y-axis {{
+        width: 46px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 16px 6px 46px 0;
+        text-align: right;
+        font-size: 10.5px;
+        color: #9AA5B1;
+        border-right: 1px solid rgba(255, 255, 255, 0.12);
+      }}
+      .scroll-area {{
+        flex: 1;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        position: relative;
+      }}
+      .scroll-area.scrubbing {{
+        overflow-x: hidden !important;
+        touch-action: none !important;
+      }}
+      .tooltip-card {{
+        position: absolute;
+        top: 8px;
+        left: 10px;
+        width: 215px;
+        background: rgba(15, 19, 26, 0.96);
+        border: 1px solid rgba(0, 180, 216, 0.65);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 12px;
+        line-height: 1.45;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: opacity 0.14s ease, transform 0.14s ease;
+        z-index: 20;
+      }}
+      .tooltip-card.visible {{
+        opacity: 1;
+        transform: translateY(0);
+      }}
+      .tt-header {{
+        display: flex;
+        justify-content: space-between;
+        font-weight: 700;
+        font-size: 13px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        padding-bottom: 4px;
+        margin-bottom: 4px;
+      }}
+      .tt-grid {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2px 8px;
+        font-size: 11.5px;
+      }}
+      .tt-lbl {{
+        color: #9AA5B1;
+      }}
+      .tt-val {{
+        font-weight: 600;
+        text-align: right;
+      }}
+    </style>
+    </head>
+    <body oncontextmenu="return false;">
+      <div class="chart-card">
+        <div class="top-bar">
+          <div class="legend" id="legend"></div>
+          <div class="hint-badge" id="hintBadge">Hold & drag to inspect</div>
+        </div>
+        <div class="chart-shell">
+          <div class="y-axis">
+            <span>{y_top_label}</span>
+            <span>{y_mid_label}</span>
+            <span>0 cm</span>
+          </div>
+          <div class="scroll-area" id="scrollArea">
+            <svg id="waveSvg" height="295"></svg>
+            <div class="tooltip-card" id="tooltipCard"></div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const points = {json.dumps(points_data)};
+        const dayLegends = {json.dumps(day_legends)};
+        const maxWave = {max_wave};
+        const dayColors = {json.dumps(DAY_HEX)};
+
+        // Render legend
+        const legendEl = document.getElementById("legend");
+        dayLegends.forEach(item => {{
+          const div = document.createElement("div");
+          div.className = "legend-item";
+          div.innerHTML = `<span class="legend-dot" style="background:${{item.color}}"></span><span>${{item.day}}</span>`;
+          legendEl.appendChild(div);
+        }});
+
+        // SVG dimensions
+        const stepX = 22;
+        const padLeft = 14;
+        const padRight = 20;
+        const padTop = 18;
+        const padBottom = 48;
+        const plotHeight = 295 - padTop - padBottom;
+        const svgWidth = Math.max(600, padLeft + padRight + (points.length - 1) * stepX);
+
+        const svg = document.getElementById("waveSvg");
+        svg.setAttribute("width", svgWidth);
+        const svgNS = "http://www.w3.org/2000/svg";
+
+        function createSvgEl(tag, attrs) {{
+          const el = document.createElementNS(svgNS, tag);
+          for (const [k, v] of Object.entries(attrs)) {{
+            el.setAttribute(k, v);
+          }}
+          return el;
+        }}
+
+        // Compute coordinates
+        const coords = points.map((p, i) => {{
+          const x = padLeft + i * stepX;
+          const ratio = Math.min(1, Math.max(0, p.waveRaw / maxWave));
+          const y = padTop + plotHeight * (1 - ratio);
+          return {{ ...p, x, y, idx: i }};
+        }});
+
+        // Background color bands per day
+        let bandStart = 0;
+        for (let i = 1; i <= coords.length; i++) {{
+          if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
+            const x1 = bandStart === 0 ? 0 : (coords[bandStart - 1].x + coords[bandStart].x) / 2;
+            const x2 = i === coords.length ? svgWidth : (coords[i - 1].x + coords[i].x) / 2;
+            const color = dayColors[coords[bandStart].dayIdx % dayColors.length];
+            svg.appendChild(createSvgEl("rect", {{
+              x: x1,
+              y: padTop,
+              width: Math.max(0, x2 - x1),
+              height: plotHeight,
+              fill: color,
+              opacity: "0.13"
+            }}));
+            bandStart = i;
+          }}
+        }}
+
+        // Horizontal grid lines
+        [0, 0.5, 1].forEach(frac => {{
+          const gy = padTop + plotHeight * (1 - frac);
+          svg.appendChild(createSvgEl("line", {{
+            x1: 0, y1: gy, x2: svgWidth, y2: gy,
+            stroke: "rgba(255,255,255,0.1)",
+            "stroke-dasharray": frac === 0 ? "none" : "3,3"
+          }}));
+        }});
+
+        // Wave curve path
+        if (coords.length > 0) {{
+          const pathD = coords.map((c, idx) => `${{idx === 0 ? "M" : "L"}} ${{c.x}} ${{c.y}}`).join(" ");
+          svg.appendChild(createSvgEl("path", {{
+            d: pathD,
+            fill: "none",
+            stroke: "#E0F7FA",
+            "stroke-width": "2.4",
+            "stroke-linejoin": "round",
+            "stroke-linecap": "round"
+          }}));
+        }}
+
+        // X-axis labels every 3 hours & hour dots
+        coords.forEach((c, idx) => {{
+          const dotColor = dayColors[c.dayIdx % dayColors.length];
+          svg.appendChild(createSvgEl("circle", {{
+            cx: c.x,
+            cy: c.y,
+            r: "3.2",
+            fill: dotColor
+          }}));
+
+          if (idx % 3 === 0) {{
+            svg.appendChild(createSvgEl("line", {{
+              x1: c.x, y1: padTop + plotHeight, x2: c.x, y2: padTop + plotHeight + 5,
+              stroke: "rgba(255,255,255,0.25)"
+            }}));
+            const label = createSvgEl("text", {{
+              x: c.x,
+              y: padTop + plotHeight + 14,
+              fill: "#B0BAC5",
+              "font-size": "10",
+              "text-anchor": "end",
+              transform: `rotate(-38 ${{c.x}} ${{padTop + plotHeight + 14}})`
+            }});
+            label.textContent = c.time;
+            svg.appendChild(label);
+          }}
+        }});
+
+        // Interactive vertical scrub bar + glowing active dot
+        const scrubLine = createSvgEl("line", {{
+          x1: 0, y1: padTop, x2: 0, y2: padTop + plotHeight,
+          stroke: "#48CAE4",
+          "stroke-width": "2",
+          "stroke-dasharray": "4,3",
+          opacity: "0"
+        }});
+        svg.appendChild(scrubLine);
+
+        const activeHalo = createSvgEl("circle", {{
+          cx: 0, cy: 0, r: "11",
+          fill: "rgba(72, 202, 228, 0.25)",
+          opacity: "0"
+        }});
+        svg.appendChild(activeHalo);
+
+        const activeDot = createSvgEl("circle", {{
+          cx: 0, cy: 0, r: "5.5",
+          fill: "#FFFFFF",
+          stroke: "#00B4D8",
+          "stroke-width": "2.5",
+          opacity: "0"
+        }});
+        svg.appendChild(activeDot);
+
+        const scrollArea = document.getElementById("scrollArea");
+        const tooltipCard = document.getElementById("tooltipCard");
+        const hintBadge = document.getElementById("hintBadge");
+
+        let selectedIdx = null;
+        let isScrubbing = false;
+        let longPressTimer = null;
+        let stopTimer = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let movedBeforeLock = false;
+
+        function getNearestIndex(clientX) {{
+          const rect = svg.getBoundingClientRect();
+          const relX = clientX - rect.left;
+          const rawIdx = Math.round((relX - padLeft) / stepX);
+          return Math.min(coords.length - 1, Math.max(0, rawIdx));
+        }}
+
+        function moveCursorTo(idx) {{
+          selectedIdx = idx;
+          const c = coords[idx];
+          const color = dayColors[c.dayIdx % dayColors.length];
+          scrubLine.setAttribute("x1", c.x);
+          scrubLine.setAttribute("x2", c.x);
+          scrubLine.setAttribute("stroke", color);
+          scrubLine.setAttribute("opacity", "0.95");
+
+          activeHalo.setAttribute("cx", c.x);
+          activeHalo.setAttribute("cy", c.y);
+          activeHalo.setAttribute("opacity", "1");
+
+          activeDot.setAttribute("cx", c.x);
+          activeDot.setAttribute("cy", c.y);
+          activeDot.setAttribute("stroke", color);
+          activeDot.setAttribute("opacity", "1");
+        }}
+
+        function hideTooltip() {{
+          tooltipCard.classList.remove("visible");
+        }}
+
+        function showTooltip() {{
+          if (selectedIdx === null) return;
+          const c = coords[selectedIdx];
+          const color = dayColors[c.dayIdx % dayColors.length];
+
+          tooltipCard.style.borderColor = color;
+          tooltipCard.innerHTML = `
+            <div class="tt-header">
+              <span style="color:${{color}}">${{c.time}}</span>
+              <span>${{c.rating}}</span>
+            </div>
+            <div class="tt-grid">
+              <span class="tt-lbl">Wave Height</span><span class="tt-val">${{c.wave}}</span>
+              <span class="tt-lbl">Swell</span><span class="tt-val">${{c.swell}}</span>
+              <span class="tt-lbl">Period</span><span class="tt-val">${{c.period}}</span>
+              <span class="tt-lbl">Wind</span><span class="tt-val">${{c.windType}}</span>
+              <span class="tt-lbl">Wind Speed</span><span class="tt-val">${{c.windSpeed}}</span>
+            </div>
+          `;
+
+          // Clamp tooltip inside visible scrolled viewport
+          const viewLeft = scrollArea.scrollLeft;
+          const viewWidth = scrollArea.clientWidth;
+          const cardW = 215;
+          let targetLeft = c.x - cardW / 2;
+          targetLeft = Math.max(viewLeft + 8, Math.min(viewLeft + viewWidth - cardW - 8, targetLeft));
+          tooltipCard.style.left = `${{targetLeft}}px`;
+          tooltipCard.classList.add("visible");
+        }}
+
+        // Touch handlers: swipe scrolls, long-press locks & drags bar, stopping shows data
+        scrollArea.addEventListener("touchstart", (e) => {{
+          if (e.touches.length !== 1) return;
+          const t = e.touches[0];
+          touchStartX = t.clientX;
+          touchStartY = t.clientY;
+          movedBeforeLock = false;
+
+          clearTimeout(longPressTimer);
+          clearTimeout(stopTimer);
+
+          longPressTimer = setTimeout(() => {{
+            isScrubbing = true;
+            scrollArea.classList.add("scrubbing");
+            hintBadge.textContent = "Drag bar • Stop to view";
+            hintBadge.classList.add("active");
+            if (navigator.vibrate) navigator.vibrate(20);
+
+            const idx = getNearestIndex(touchStartX);
+            moveCursorTo(idx);
+            hideTooltip();
+          }}, 260);
+        }}, {{ passive: true }});
+
+        scrollArea.addEventListener("touchmove", (e) => {{
+          if (e.touches.length !== 1) return;
+          const t = e.touches[0];
+
+          if (!isScrubbing) {{
+            const dx = Math.abs(t.clientX - touchStartX);
+            const dy = Math.abs(t.clientY - touchStartY);
+            if (dx > 8 || dy > 8) {{
+              movedBeforeLock = true;
+              clearTimeout(longPressTimer);
+            }}
+            return;
+          }}
+
+          // Locked in scrub mode: prevent scrolling and drag bar smoothly
+          e.preventDefault();
+          const idx = getNearestIndex(t.clientX);
+          if (idx !== selectedIdx) {{
+            moveCursorTo(idx);
+          }}
+          hideTooltip();
+
+          clearTimeout(stopTimer);
+          stopTimer = setTimeout(() => {{
+            showTooltip();
+          }}, 200);
+        }}, {{ passive: false }});
+
+        function endTouch(e) {{
+          clearTimeout(longPressTimer);
+          clearTimeout(stopTimer);
+
+          if (isScrubbing) {{
+            isScrubbing = false;
+            scrollArea.classList.remove("scrubbing");
+            hintBadge.textContent = "Hold & drag to inspect";
+            hintBadge.classList.remove("active");
+            showTooltip();
+          }} else if (!movedBeforeLock && e.changedTouches && e.changedTouches.length > 0) {{
+            // Quick tap selects point and shows data immediately
+            const idx = getNearestIndex(e.changedTouches[0].clientX);
+            moveCursorTo(idx);
+            showTooltip();
+          }}
+        }}
+
+        scrollArea.addEventListener("touchend", endTouch, {{ passive: true }});
+        scrollArea.addEventListener("touchcancel", endTouch, {{ passive: true }});
+
+        // Desktop mouse support
+        let mouseDown = false;
+        svg.addEventListener("mousedown", (e) => {{
+          mouseDown = true;
+          const idx = getNearestIndex(e.clientX);
+          moveCursorTo(idx);
+          hideTooltip();
+        }});
+        window.addEventListener("mousemove", (e) => {{
+          if (!mouseDown) return;
+          const idx = getNearestIndex(e.clientX);
+          moveCursorTo(idx);
+          hideTooltip();
+          clearTimeout(stopTimer);
+          stopTimer = setTimeout(() => showTooltip(), 180);
+        }});
+        window.addEventListener("mouseup", () => {{
+          if (!mouseDown) return;
+          mouseDown = false;
+          clearTimeout(stopTimer);
+          showTooltip();
+        }});
+      </script>
+    </body>
+    </html>
+    """
+    components.html(html_code, height=345)
+
+
 # Load spot forecast
 df, daily_df, water_temp = get_forecast_data(spot["lat"], spot["lon"])
 
@@ -369,98 +865,13 @@ elif df_daylight["Wave Height (m)"].max() < 0.45:
 else:
     st.info("No high-scoring sessions yet, check the highest-rated daylight hours in the table below.")
 
-# 6. Horizontally scrollable wave height chart with colored day bands & dots
-st.subheader("Wave Height Chart (Tap anywhere or swipe →)")
+# 6. Interactive Wave Height Chart (long-press to scrub bar, release/stop to show data)
+st.subheader("Wave Height Chart")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
     max_wave = 1.0
 
-min_dt = df["DateTime"].min()
-max_dt = df["DateTime"].max()
-spans = []
-for i, d in enumerate(unique_dates):
-    start_dt = max(min_dt, pd.Timestamp(d))
-    end_dt = min(max_dt, pd.Timestamp(d) + pd.Timedelta(days=1))
-    spans.append({
-        "start": start_dt,
-        "end": end_dt,
-        "Day": pd.Timestamp(d).strftime("%a"),
-    })
-spans_df = pd.DataFrame(spans)
-day_domain = [s["Day"] for s in spans]
-day_range = [DAY_HEX[i % len(DAY_HEX)] for i in range(len(spans))]
-
-nearest = alt.selection_point(
-    nearest=True,
-    on="pointerover, pointerdown",
-    fields=["DateTime"],
-    empty=False,
-)
-
-bg_rects = (
-    alt.Chart(spans_df)
-    .mark_rect(opacity=0.14)
-    .encode(
-        x="start:T",
-        x2="end:T",
-        color=alt.Color(
-            "Day:N",
-            scale=alt.Scale(domain=day_domain, range=day_range),
-            legend=alt.Legend(title="Day", orient="top"),
-        ),
-    )
-)
-
-base = alt.Chart(df).encode(
-    x=alt.X(
-        "DateTime:T",
-        title="Day & Time",
-        axis=alt.Axis(format="%a %H:%M", labelAngle=-45, tickCount=24),
-    )
-)
-
-line = base.mark_line(color="#E0F7FA").encode(
-    y=alt.Y(
-        "Wave Height (m):Q",
-        scale=alt.Scale(domain=[0, max_wave]),
-        title="Wave Height (m)",
-    )
-)
-
-selectors = (
-    base.mark_rule(strokeWidth=20)
-    .encode(
-        opacity=alt.value(0),
-        tooltip=[
-            alt.Tooltip("Time:N", title="Time"),
-            alt.Tooltip("Rating:N", title="Rating"),
-            alt.Tooltip("Wave Height:N", title="Wave Height"),
-            alt.Tooltip("Swell:N", title="Swell"),
-            alt.Tooltip("Period:N", title="Period"),
-            alt.Tooltip("Wind Type:N", title="Wind"),
-            alt.Tooltip("Wind Speed:N", title="Wind Speed"),
-        ],
-    )
-    .add_params(nearest)
-)
-
-rules = base.mark_rule(color="gray", strokeDash=[4, 4]).encode(
-    opacity=alt.condition(nearest, alt.value(0.85), alt.value(0))
-)
-
-points = base.mark_circle(size=85).encode(
-    y=alt.Y("Wave Height (m):Q", scale=alt.Scale(domain=[0, max_wave])),
-    color=alt.Color(
-        "Day:N",
-        scale=alt.Scale(domain=day_domain, range=day_range),
-        legend=None,
-    ),
-    opacity=alt.condition(nearest, alt.value(1), alt.value(0.65)),
-)
-
-chart = alt.layer(bg_rects, line, selectors, rules, points).properties(width=1400, height=300)
-
-st.altair_chart(chart, use_container_width=False)
+render_touch_scrub_chart(df, max_wave)
 
 # 7. Full Daylight Forecast Table (color-coded by day)
 st.subheader("Full Daylight Forecast (Dawn to Dusk)")
