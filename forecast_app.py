@@ -24,9 +24,9 @@ text_color = "#F8FAFC" if is_dark else "#1A2B4C"
 sub_text = "#94A3B8" if is_dark else "#6B7280"
 border_color = "#334155" if is_dark else "#E5E7EB"
 
-# צבעי הגרף עודכנו לכחול מעט בהיר יותר במצב הבהיר
-chart_line = "#38BDF8" if is_dark else "#2A4A7F"
-chart_grad_top = "#38BDF8" if is_dark else "#9BA9B8"
+# הוחזר לצבעים המקוריים עבור מצב בהיר
+chart_line = "#38BDF8" if is_dark else "#1A2B4C"
+chart_grad_top = "#38BDF8" if is_dark else "#8997A8"
 
 grid_color = "#334155" if is_dark else "#CBD5E1"
 db_cell_bg = "#0F172A" if is_dark else "#F9FAFB"
@@ -180,7 +180,6 @@ def get_forecast_data(lat, lon):
         f"&hourly=wave_height,wave_period,swell_wave_height,sea_surface_temperature"
         f"&current=sea_surface_temperature&timezone=auto&forecast_days=7"
     )
-    # מגבלת ה-10 שניות כדי למנוע היתקעות במקרה של בעיות רשת
     wave_data = requests.get(marine_url, timeout=10).json()
 
     weather_url = (
@@ -255,22 +254,24 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
 
     return min(10.0, max(5.0, round(height_score + period_score + wind_score, 1)))
 
-def get_rating_tier(score):
-    if score >= 7.0: return "green", "#48BB78", "rgba(72, 187, 120, 0.2)", "🟢"
-    elif score >= 4.0: return "orange", "#ECC94B", "rgba(236, 201, 75, 0.25)", "🟠"
-    return "red", "#F56565", "rgba(245, 101, 101, 0.2)", "🔴"
+def get_rating_tier(score, is_dark_theme):
+    # Returns: (Chart Dot Color, Table Text Color, Table BG Color)
+    if score >= 7.0: 
+        return "#48BB78", ("#4ADE80" if is_dark_theme else "#15803D"), "rgba(72, 187, 120, 0.2)"
+    elif score >= 4.0: 
+        return "#ECC94B", ("#FBBF24" if is_dark_theme else "#B45309"), "rgba(236, 201, 75, 0.25)"
+    return "#F56565", ("#F87171" if is_dark_theme else "#B91C1C"), "rgba(245, 101, 101, 0.2)"
 
 def format_rating_badge(score):
-    _, _, _, icon = get_rating_tier(score)
-    return f"{score}/10 {icon}"
+    return f"{score}/10"
 
 def style_forecast_table(source_df, cols):
     display_df = source_df[cols].copy()
     scores = source_df["Score"]
     def highlight_rating(row):
         s = scores.loc[row.name]
-        _, text_hex, bg_rgba, _ = get_rating_tier(s)
-        rating_css = f"background-color: {bg_rgba}; color: {text_color}; font-weight: 700;"
+        _, text_hex, bg_rgba = get_rating_tier(s, is_dark)
+        rating_css = f"background-color: {bg_rgba}; color: {text_hex} !important; font-weight: 800;"
         return [rating_css if col == "Rating" else "" for col in row.index]
     return display_df.style.apply(highlight_rating, axis=1)
 
@@ -339,10 +340,10 @@ y_one_q_label = format_height_with_unit(max_wave_m * 0.25)
 points_data = []
 for _, row in df_chart.iterrows():
     val = row["Wave Height (m)"]
-    _, hex_color, _, _ = get_rating_tier(row["Score"])
+    chart_color, text_color, _ = get_rating_tier(row["Score"], is_dark)
     points_data.append({
         "time": row["Time"], "day": row["Day"], "hour": int(row["DateTime"].hour),
-        "dayIdx": int(row["DayIdx"]), "ratingColor": hex_color, "rating": row["Rating"],
+        "dayIdx": int(row["DayIdx"]), "ratingColor": chart_color, "rating": row["Rating"],
         "wave": row["Wave Height"], "swell": row["Swell"], "period": row["Period"],
         "windType": row["Wind Type"], "windSpeed": row["Wind Speed"],
         "waveRaw": 0.0 if pd.isna(val) else float(val)
