@@ -353,7 +353,7 @@ def render_touch_scrub_chart(df, max_wave):
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 6px;
+        margin-bottom: 8px;
         padding: 0 4px;
         font-size: 12px;
       }}
@@ -386,11 +386,63 @@ def render_touch_scrub_chart(df, max_wave):
         color: #48CAE4;
         font-weight: 600;
       }}
+      /* Data box sits ABOVE the chart so it never covers the wave line */
+      .data-box {{
+        display: none;
+        width: 100%;
+        margin-bottom: 8px;
+        background: rgba(15, 19, 26, 0.96);
+        border: 1.5px solid rgba(0, 180, 216, 0.7);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }}
+      .data-box.visible {{
+        display: block;
+      }}
+      .db-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 700;
+        font-size: 13px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        padding-bottom: 4px;
+        margin-bottom: 6px;
+      }}
+      .db-close {{
+        font-size: 12px;
+        color: #9AA5B1;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        padding: 1px 7px;
+      }}
+      .db-grid {{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        text-align: center;
+      }}
+      .db-cell {{
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 6px;
+        padding: 4px 2px;
+      }}
+      .db-lbl {{
+        display: block;
+        font-size: 10px;
+        color: #9AA5B1;
+      }}
+      .db-val {{
+        font-weight: 700;
+        font-size: 12px;
+      }}
       .chart-shell {{
         display: flex;
         position: relative;
         width: 100%;
-        height: 295px;
+        height: 290px;
       }}
       .y-axis {{
         width: 46px;
@@ -415,58 +467,18 @@ def render_touch_scrub_chart(df, max_wave):
         overflow-x: hidden !important;
         touch-action: none !important;
       }}
-      .tooltip-card {{
-        position: absolute;
-        top: 8px;
-        left: 10px;
-        width: 215px;
-        background: rgba(15, 19, 26, 0.96);
-        border: 1px solid rgba(0, 180, 216, 0.65);
-        border-radius: 10px;
-        padding: 8px 10px;
-        font-size: 12px;
-        line-height: 1.45;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
-        pointer-events: none;
-        opacity: 0;
-        transform: translateY(-4px);
-        transition: opacity 0.14s ease, transform 0.14s ease;
-        z-index: 20;
-      }}
-      .tooltip-card.visible {{
-        opacity: 1;
-        transform: translateY(0);
-      }}
-      .tt-header {{
-        display: flex;
-        justify-content: space-between;
-        font-weight: 700;
-        font-size: 13px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-        padding-bottom: 4px;
-        margin-bottom: 4px;
-      }}
-      .tt-grid {{
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2px 8px;
-        font-size: 11.5px;
-      }}
-      .tt-lbl {{
-        color: #9AA5B1;
-      }}
-      .tt-val {{
-        font-weight: 600;
-        text-align: right;
-      }}
     </style>
     </head>
     <body oncontextmenu="return false;">
-      <div class="chart-card">
+      <div class="chart-card" id="chartCard">
         <div class="top-bar">
           <div class="legend" id="legend"></div>
           <div class="hint-badge" id="hintBadge">Hold & drag to inspect</div>
         </div>
+
+        <!-- Data box positioned above the chart -->
+        <div class="data-box" id="dataBox"></div>
+
         <div class="chart-shell">
           <div class="y-axis">
             <span>{y_top_label}</span>
@@ -474,8 +486,7 @@ def render_touch_scrub_chart(df, max_wave):
             <span>0 cm</span>
           </div>
           <div class="scroll-area" id="scrollArea">
-            <svg id="waveSvg" height="295"></svg>
-            <div class="tooltip-card" id="tooltipCard"></div>
+            <svg id="waveSvg" height="290"></svg>
           </div>
         </div>
       </div>
@@ -501,7 +512,7 @@ def render_touch_scrub_chart(df, max_wave):
         const padRight = 20;
         const padTop = 18;
         const padBottom = 48;
-        const plotHeight = 295 - padTop - padBottom;
+        const plotHeight = 290 - padTop - padBottom;
         const svgWidth = Math.max(600, padLeft + padRight + (points.length - 1) * stepX);
 
         const svg = document.getElementById("waveSvg");
@@ -620,17 +631,27 @@ def render_touch_scrub_chart(df, max_wave):
         }});
         svg.appendChild(activeDot);
 
+        const chartCard = document.getElementById("chartCard");
         const scrollArea = document.getElementById("scrollArea");
-        const tooltipCard = document.getElementById("tooltipCard");
+        const dataBox = document.getElementById("dataBox");
         const hintBadge = document.getElementById("hintBadge");
 
         let selectedIdx = null;
+        let isBoxVisible = false;
         let isScrubbing = false;
         let longPressTimer = null;
         let stopTimer = null;
         let touchStartX = 0;
         let touchStartY = 0;
         let movedBeforeLock = false;
+
+        function syncIframeHeight() {{
+          try {{
+            if (window.frameElement) {{
+              window.frameElement.style.height = (chartCard.offsetHeight + 6) + "px";
+            }}
+          }} catch (e) {{}}
+        }}
 
         function getNearestIndex(clientX) {{
           const rect = svg.getBoundingClientRect();
@@ -658,41 +679,55 @@ def render_touch_scrub_chart(df, max_wave):
           activeDot.setAttribute("opacity", "1");
         }}
 
-        function hideTooltip() {{
-          tooltipCard.classList.remove("visible");
+        function hideDataBoxOnly() {{
+          isBoxVisible = false;
+          dataBox.classList.remove("visible");
+          syncIframeHeight();
         }}
 
-        function showTooltip() {{
+        function closeAllSelection() {{
+          selectedIdx = null;
+          isBoxVisible = false;
+          dataBox.classList.remove("visible");
+          scrubLine.setAttribute("opacity", "0");
+          activeHalo.setAttribute("opacity", "0");
+          activeDot.setAttribute("opacity", "0");
+          syncIframeHeight();
+        }}
+
+        function showDataBox() {{
           if (selectedIdx === null) return;
           const c = coords[selectedIdx];
           const color = dayColors[c.dayIdx % dayColors.length];
 
-          tooltipCard.style.borderColor = color;
-          tooltipCard.innerHTML = `
-            <div class="tt-header">
+          dataBox.style.borderColor = color;
+          dataBox.innerHTML = `
+            <div class="db-header">
               <span style="color:${{color}}">${{c.time}}</span>
               <span>${{c.rating}}</span>
+              <span class="db-close">✕</span>
             </div>
-            <div class="tt-grid">
-              <span class="tt-lbl">Wave Height</span><span class="tt-val">${{c.wave}}</span>
-              <span class="tt-lbl">Swell</span><span class="tt-val">${{c.swell}}</span>
-              <span class="tt-lbl">Period</span><span class="tt-val">${{c.period}}</span>
-              <span class="tt-lbl">Wind</span><span class="tt-val">${{c.windType}}</span>
-              <span class="tt-lbl">Wind Speed</span><span class="tt-val">${{c.windSpeed}}</span>
+            <div class="db-grid">
+              <div class="db-cell"><span class="db-lbl">Wave</span><span class="db-val">${{c.wave}}</span></div>
+              <div class="db-cell"><span class="db-lbl">Swell</span><span class="db-val">${{c.swell}}</span></div>
+              <div class="db-cell"><span class="db-lbl">Period</span><span class="db-val">${{c.period}}</span></div>
+              <div class="db-cell"><span class="db-lbl">Wind</span><span class="db-val">${{c.windType}}</span></div>
+              <div class="db-cell"><span class="db-lbl">Speed</span><span class="db-val">${{c.windSpeed}}</span></div>
             </div>
           `;
 
-          // Clamp tooltip inside visible scrolled viewport
-          const viewLeft = scrollArea.scrollLeft;
-          const viewWidth = scrollArea.clientWidth;
-          const cardW = 215;
-          let targetLeft = c.x - cardW / 2;
-          targetLeft = Math.max(viewLeft + 8, Math.min(viewLeft + viewWidth - cardW - 8, targetLeft));
-          tooltipCard.style.left = `${{targetLeft}}px`;
-          tooltipCard.classList.add("visible");
+          isBoxVisible = true;
+          dataBox.classList.add("visible");
+          syncIframeHeight();
         }}
 
-        // Touch handlers: swipe scrolls, long-press locks & drags bar, stopping shows data
+        // Tapping the data box itself closes it
+        dataBox.addEventListener("click", (e) => {{
+          e.stopPropagation();
+          closeAllSelection();
+        }});
+
+        // Touch handlers: swipe scrolls, long-press locks & drags bar, stopping shows data above chart
         scrollArea.addEventListener("touchstart", (e) => {{
           if (e.touches.length !== 1) return;
           const t = e.touches[0];
@@ -712,7 +747,7 @@ def render_touch_scrub_chart(df, max_wave):
 
             const idx = getNearestIndex(touchStartX);
             moveCursorTo(idx);
-            hideTooltip();
+            hideDataBoxOnly();
           }}, 260);
         }}, {{ passive: true }});
 
@@ -736,11 +771,11 @@ def render_touch_scrub_chart(df, max_wave):
           if (idx !== selectedIdx) {{
             moveCursorTo(idx);
           }}
-          hideTooltip();
+          hideDataBoxOnly();
 
           clearTimeout(stopTimer);
           stopTimer = setTimeout(() => {{
-            showTooltip();
+            showDataBox();
           }}, 200);
         }}, {{ passive: false }});
 
@@ -753,12 +788,15 @@ def render_touch_scrub_chart(df, max_wave):
             scrollArea.classList.remove("scrubbing");
             hintBadge.textContent = "Hold & drag to inspect";
             hintBadge.classList.remove("active");
-            showTooltip();
+            showDataBox();
           }} else if (!movedBeforeLock && e.changedTouches && e.changedTouches.length > 0) {{
-            // Quick tap selects point and shows data immediately
             const idx = getNearestIndex(e.changedTouches[0].clientX);
-            moveCursorTo(idx);
-            showTooltip();
+            if (isBoxVisible && idx === selectedIdx) {{
+              closeAllSelection();
+            }} else {{
+              moveCursorTo(idx);
+              showDataBox();
+            }}
           }}
         }}
 
@@ -767,31 +805,49 @@ def render_touch_scrub_chart(df, max_wave):
 
         // Desktop mouse support
         let mouseDown = false;
+        let mouseDragged = false;
+        let mouseDownX = 0;
+
         svg.addEventListener("mousedown", (e) => {{
           mouseDown = true;
-          const idx = getNearestIndex(e.clientX);
-          moveCursorTo(idx);
-          hideTooltip();
+          mouseDragged = false;
+          mouseDownX = e.clientX;
         }});
         window.addEventListener("mousemove", (e) => {{
           if (!mouseDown) return;
+          if (Math.abs(e.clientX - mouseDownX) > 4) {{
+            mouseDragged = true;
+          }}
+          if (!mouseDragged) return;
           const idx = getNearestIndex(e.clientX);
           moveCursorTo(idx);
-          hideTooltip();
+          hideDataBoxOnly();
           clearTimeout(stopTimer);
-          stopTimer = setTimeout(() => showTooltip(), 180);
+          stopTimer = setTimeout(() => showDataBox(), 180);
         }});
-        window.addEventListener("mouseup", () => {{
+        window.addEventListener("mouseup", (e) => {{
           if (!mouseDown) return;
           mouseDown = false;
           clearTimeout(stopTimer);
-          showTooltip();
+          if (!mouseDragged) {{
+            const idx = getNearestIndex(e.clientX);
+            if (isBoxVisible && idx === selectedIdx) {{
+              closeAllSelection();
+            }} else {{
+              moveCursorTo(idx);
+              showDataBox();
+            }}
+          }} else {{
+            showDataBox();
+          }}
         }});
+
+        syncIframeHeight();
       </script>
     </body>
     </html>
     """
-    components.html(html_code, height=345)
+    components.html(html_code, height=455)
 
 
 # Load spot forecast
@@ -865,7 +921,7 @@ elif df_daylight["Wave Height (m)"].max() < 0.45:
 else:
     st.info("No high-scoring sessions yet, check the highest-rated daylight hours in the table below.")
 
-# 6. Interactive Wave Height Chart (long-press to scrub bar, release/stop to show data)
+# 6. Interactive Wave Height Chart (data card opens above chart; tap box again to close)
 st.subheader("Wave Height Chart")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
