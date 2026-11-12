@@ -70,6 +70,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Color palette per forecast day (Day 1 = Cyan, Day 2 = Emerald, Day 3 = Amber)
+DAY_HEX = ["#00B4D8", "#2ECC71", "#F39C12"]
+DAY_BG_RGBA = [
+    "rgba(0, 180, 216, 0.16)",
+    "rgba(46, 204, 113, 0.16)",
+    "rgba(243, 156, 18, 0.16)",
+]
+
 # Surf spots database: coordinates, coastline wind angles, and local cam URL
 SPOTS = {
     "Herzliya (Marina / Dabush)": {
@@ -160,7 +168,7 @@ def get_forecast_data(lat, lon):
         "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"],
     })
     df["Date"] = df["DateTime"].dt.date
-    # Format as day name + hour (e.g., Thu 14:00)
+    df["Day"] = df["DateTime"].dt.strftime("%a")
     df["Time"] = df["DateTime"].dt.strftime("%a %H:00")
 
     daily_df = pd.DataFrame({
@@ -279,8 +287,24 @@ def format_rating_badge(score):
     return f"{score}/10 💤"
 
 
+def style_table_by_day(source_df, cols):
+    display_df = source_df[cols].copy()
+    day_indices = source_df["DayIdx"]
+
+    def highlight_row(row):
+        idx = int(day_indices.loc[row.name]) % len(DAY_BG_RGBA)
+        return [f"background-color: {DAY_BG_RGBA[idx]}"] * len(row)
+
+    return display_df.style.apply(highlight_row, axis=1)
+
+
 # Load spot forecast
 df, daily_df, water_temp = get_forecast_data(spot["lat"], spot["lon"])
+
+# Assign day index (0, 1, 2) for consistent color coding
+unique_dates = sorted(df["Date"].unique())
+day_to_idx = {d: i for i, d in enumerate(unique_dates)}
+df["DayIdx"] = df["Date"].map(day_to_idx)
 
 # 3. Side-by-side Water Temp, Sunrise & Sunset Cards
 temp_display, wetsuit_advice = get_wetsuit_recommendation(water_temp)
@@ -330,7 +354,7 @@ df_daylight = df[
     & (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# 5. Session Recommendations
+# 5. Session Recommendations (color-coded by day)
 best_conditions = df_daylight[df_daylight["Score"] >= 6.8]
 
 st.subheader("🏄 Session Recommendations")
@@ -338,26 +362,53 @@ if not best_conditions.empty:
     st.success(
         f"Prime windows spotted at {selected_spot_name}! Clean wall and favorable winds for pumping and rail carves:"
     )
-    st.dataframe(
-        best_conditions[["Time", "Rating", "Wave Height", "Period", "Wind Type", "Wind Speed"]],
-        hide_index=True,
-    )
+    rec_cols = ["Time", "Rating", "Wave Height", "Period", "Wind Type", "Wind Speed"]
+    st.dataframe(style_table_by_day(best_conditions, rec_cols), hide_index=True)
 elif df_daylight["Wave Height (m)"].max() < 0.45:
     st.warning("Flat spell ahead. Ideal time for a dry-land surfskate session to dial in foot placement and carving mechanics.")
 else:
     st.info("No high-scoring sessions yet, check the highest-rated daylight hours in the table below.")
 
-# 6. Horizontally scrollable wave height chart with day labels and full-height touch detection
+# 6. Horizontally scrollable wave height chart with colored day bands & dots
 st.subheader("Wave Height Chart (Tap anywhere or swipe →)")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
     max_wave = 1.0
+
+min_dt = df["DateTime"].min()
+max_dt = df["DateTime"].max()
+spans = []
+for i, d in enumerate(unique_dates):
+    start_dt = max(min_dt, pd.Timestamp(d))
+    end_dt = min(max_dt, pd.Timestamp(d) + pd.Timedelta(days=1))
+    spans.append({
+        "start": start_dt,
+        "end": end_dt,
+        "Day": pd.Timestamp(d).strftime("%a"),
+    })
+spans_df = pd.DataFrame(spans)
+day_domain = [s["Day"] for s in spans]
+day_range = [DAY_HEX[i % len(DAY_HEX)] for i in range(len(spans))]
 
 nearest = alt.selection_point(
     nearest=True,
     on="pointerover, pointerdown",
     fields=["DateTime"],
     empty=False,
+)
+
+bg_rects = (
+    alt.Chart(spans_df)
+    .mark_rect(opacity=0.14)
+    .encode(
+        x="start:T",
+        x2="end:T",
+        color=alt.Color(
+            "Day:N",
+            scale=alt.Scale(domain=day_domain, range=day_range),
+            legend=alt.Legend(title="Day", orient="top"),
+        ),
+    )
 )
 
 base = alt.Chart(df).encode(
@@ -368,7 +419,7 @@ base = alt.Chart(df).encode(
     )
 )
 
-line = base.mark_line().encode(
+line = base.mark_line(color="#E0F7FA").encode(
     y=alt.Y(
         "Wave Height (m):Q",
         scale=alt.Scale(domain=[0, max_wave]),
@@ -397,18 +448,21 @@ rules = base.mark_rule(color="gray", strokeDash=[4, 4]).encode(
     opacity=alt.condition(nearest, alt.value(0.85), alt.value(0))
 )
 
-points = base.mark_circle(size=85, color="#00B4D8").encode(
+points = base.mark_circle(size=85).encode(
     y=alt.Y("Wave Height (m):Q", scale=alt.Scale(domain=[0, max_wave])),
-    opacity=alt.condition(nearest, alt.value(1), alt.value(0.35)),
+    color=alt.Color(
+        "Day:N",
+        scale=alt.Scale(domain=day_domain, range=day_range),
+        legend=None,
+    ),
+    opacity=alt.condition(nearest, alt.value(1), alt.value(0.65)),
 )
 
-chart = alt.layer(line, selectors, rules, points).properties(width=1400, height=300)
+chart = alt.layer(bg_rects, line, selectors, rules, points).properties(width=1400, height=300)
 
 st.altair_chart(chart, use_container_width=False)
 
-# 7. Full Daylight Forecast Table
+# 7. Full Daylight Forecast Table (color-coded by day)
 st.subheader("Full Daylight Forecast (Dawn to Dusk)")
-st.dataframe(
-    df_daylight[["Time", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]],
-    hide_index=True,
-)
+full_cols = ["Time", "Rating", "Wave Height", "Swell", "Period", "Wind Type", "Wind Speed"]
+st.dataframe(style_table_by_day(df_daylight, full_cols), hide_index=True)
