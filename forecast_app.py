@@ -473,7 +473,7 @@ def render_touch_scrub_chart(df, max_wave):
       <div class="chart-card" id="chartCard">
         <div class="top-bar">
           <div class="legend" id="legend"></div>
-          <div class="hint-badge" id="hintBadge">Hold & drag to inspect</div>
+          <div class="hint-badge" id="hintBadge">Tap • Hold to drag</div>
         </div>
 
         <!-- Data box positioned above the chart -->
@@ -727,7 +727,7 @@ def render_touch_scrub_chart(df, max_wave):
           closeAllSelection();
         }});
 
-        // Touch handlers: swipe scrolls, long-press locks & drags bar, stopping shows data above chart
+        // Touch handlers: short tap selects immediately, swipe scrolls, long-press drags bar
         scrollArea.addEventListener("touchstart", (e) => {{
           if (e.touches.length !== 1) return;
           const t = e.touches[0];
@@ -748,7 +748,7 @@ def render_touch_scrub_chart(df, max_wave):
             const idx = getNearestIndex(touchStartX);
             moveCursorTo(idx);
             hideDataBoxOnly();
-          }}, 260);
+          }}, 240);
         }}, {{ passive: true }});
 
         scrollArea.addEventListener("touchmove", (e) => {{
@@ -758,7 +758,7 @@ def render_touch_scrub_chart(df, max_wave):
           if (!isScrubbing) {{
             const dx = Math.abs(t.clientX - touchStartX);
             const dy = Math.abs(t.clientY - touchStartY);
-            if (dx > 8 || dy > 8) {{
+            if (dx > 14 || dy > 14) {{
               movedBeforeLock = true;
               clearTimeout(longPressTimer);
             }}
@@ -786,10 +786,11 @@ def render_touch_scrub_chart(df, max_wave):
           if (isScrubbing) {{
             isScrubbing = false;
             scrollArea.classList.remove("scrubbing");
-            hintBadge.textContent = "Hold & drag to inspect";
+            hintBadge.textContent = "Tap • Hold to drag";
             hintBadge.classList.remove("active");
             showDataBox();
           }} else if (!movedBeforeLock && e.changedTouches && e.changedTouches.length > 0) {{
+            // Short tap selects point immediately (or closes if tapping same point again)
             const idx = getNearestIndex(e.changedTouches[0].clientX);
             if (isBoxVisible && idx === selectedIdx) {{
               closeAllSelection();
@@ -921,7 +922,7 @@ elif df_daylight["Wave Height (m)"].max() < 0.45:
 else:
     st.info("No high-scoring sessions yet, check the highest-rated daylight hours in the table below.")
 
-# 6. Interactive Wave Height Chart (data card opens above chart; tap box again to close)
+# 6. Interactive Wave Height Chart (short tap selects immediately, long press drags)
 st.subheader("Wave Height Chart")
 max_wave = float(df["Wave Height (m)"].max())
 if pd.isna(max_wave) or max_wave <= 0:
