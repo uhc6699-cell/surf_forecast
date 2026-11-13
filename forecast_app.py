@@ -264,6 +264,7 @@ def get_forecast_data(lat, lon):
     )
     
     try:
+        # העלינו את ה-timeout ל-20 שניות
         wave_response = requests.get(marine_url, timeout=20)
         wave_response.raise_for_status()
         wave_data = wave_response.json()
@@ -271,8 +272,9 @@ def get_forecast_data(lat, lon):
         weather_response = requests.get(weather_url, timeout=20)
         weather_response.raise_for_status()
         wind_data = weather_response.json()
-    except requests.exceptions.RequestException as e:
-        st.error(f"שגיאת תקשורת מול שרת הנתונים (Timeout/Network Error): {e}")
+    except requests.exceptions.RequestException:
+        # במקרה של שגיאה - נציג הודעה יפה ונעצור בלי לקרוס
+        st.warning("⏳ השרת של מזג האוויר עמוס כרגע או שזמן הבקשה פג. אנא רענן את העמוד בעוד מספר שניות.")
         st.stop()
 
     df = pd.DataFrame({
