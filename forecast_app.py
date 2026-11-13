@@ -379,7 +379,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart - Include all hours to show night continuity, but with spacing between days
+# Smooth Wave Chart - Include all hours to show night continuity, with a subtle night gap
 max_wave_m = 2.0
 
 if unit_sys == "metric":
@@ -398,7 +398,6 @@ def fmt_chart_tooltip(val, u_sys):
     else:
         return f"{round(val * 3.28084, 1)} ft"
 
-# Process all hours for the chart so night data is present
 points_data = []
 prev_day_idx = None
 for _, row in df.iterrows():
@@ -406,8 +405,6 @@ for _, row in df.iterrows():
     _, hex_color, _ = get_rating_details(row["Score"], is_dark)
     current_day_idx = int(row["DayIdx"])
     
-    # Insert a small night gap item if day changes
-    is_night_gap = False
     if prev_day_idx is not None and current_day_idx != prev_day_idx:
         points_data.append({
             "isGap": True,
@@ -488,7 +485,7 @@ html_chart = f"""
     const maxWave = {max_wave_m};
     
     const normalStepX = 11;
-    const gapStepX = 22;
+    const gapStepX = 14; // Subtle, small gap to prevent text overlapping cleanly
     const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
     let currentX = padLeft;
