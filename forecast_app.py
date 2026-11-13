@@ -114,7 +114,7 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
-    /* Layout fix for Columns - Forces items side-by-side on mobile */
+    /* Layout fix for Columns - Forces Unit Switcher buttons side-by-side on mobile */
     div[data-testid="stHorizontalBlock"] {{
         flex-wrap: nowrap !important;
         gap: 12px !important;
@@ -154,16 +154,6 @@ st.markdown(
         display: flex;
         flex-direction: column;
     }}
-    .sf-header-row {{
-        display: grid;
-        grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px;
-        border-bottom: 1px solid {border_color};
-        text-align: center;
-        font-size: 0.75rem;
-        font-weight: 700;
-        color: {sub_text};
-        background: {db_cell_bg};
-    }}
     .sf-row {{
         display: grid;
         grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px;
@@ -174,14 +164,14 @@ st.markdown(
     .sf-row:last-child {{ border-bottom: none; }}
     
     /* Vertical Dividers */
-    .sf-header-row > div, .sf-row > div {{
+    .sf-row > div {{
         padding: 10px 4px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
     }}
-    .sf-header-row > div:not(:last-child), .sf-row > div:not(:last-child) {{
+    .sf-row > div:not(:last-child) {{
         border-right: 1px solid {border_color};
     }}
     
@@ -239,14 +229,13 @@ SPOTS = {
     "Haifa - Bat Galim": {"lat": 32.836, "lon": 34.978, "offshore": (130, 225), "onshore": (310, 45), "cam": "https://www.beachcam.co.il/batgalim.html"},
 }
 
-col_spot, col_theme = st.columns([3, 1])
-with col_spot:
-    selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
-with col_theme:
-    new_theme = st.toggle("🌙 Dark Mode", value=is_dark, key="theme_toggle")
-    if new_theme != is_dark:
-        st.session_state.theme = "dark" if new_theme else "light"
-        st.rerun()
+# Centered Spot Selector & Dark Mode Toggle (Sequential to keep Selectbox full width)
+selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
+new_theme = st.toggle("🌙 Dark Mode", value=is_dark, key="theme_toggle")
+
+if new_theme != is_dark:
+    st.session_state.theme = "dark" if new_theme else "light"
+    st.rerun()
 
 spot = SPOTS[selected_spot_name]
 short_spot_name = selected_spot_name.split(" (")[0].split(" - ")[-1]
@@ -696,7 +685,7 @@ def generate_html_rows(day_df, u_sys):
 
         # Water Temp Info
         wat_t = row["Water Temp (°C)"]
-        wat_str = f"{wat_t:.1f}°" if not pd.isna(wat_t) else "-"
+        wat_str = f"💧 {wat_t:.1f}°" if not pd.isna(wat_t) else "-"
 
         html += f"""
         <div class="sf-row">
@@ -725,7 +714,7 @@ df_daylight = df[
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# Inject Dynamic CSS to perfectly color our matched Left/Right buttons
+# Inject Dynamic CSS to perfectly color our matched Left/Right unit buttons
 is_metric = (unit_sys == "metric")
 st.markdown(f"""
 <style>
@@ -786,28 +775,22 @@ for i, d in enumerate(unique_dates):
     
     summary_df = pd.DataFrame(summary_hours)
     
-    # Render Summary Table
+    # Render Summary Table without header row
     if not summary_df.empty:
         summary_html = f"""
         <div class="sf-table-wrapper">
             <div class="sf-table-container">
-                <div class="sf-header-row">
-                    <div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div>
-                </div>
                 {generate_html_rows(summary_df, unit_sys)}
             </div>
         </div>
         """
         st.markdown(summary_html, unsafe_allow_html=True)
 
-    # Hourly Expander
+    # Hourly Expander without header row
     with st.expander("Show all daylight hours"):
         hourly_html = f"""
         <div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;">
             <div class="sf-table-container">
-                <div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
-                    <div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div>
-                </div>
                 {generate_html_rows(day_dl_df, unit_sys)}
             </div>
         </div>
