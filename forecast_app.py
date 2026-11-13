@@ -259,7 +259,6 @@ def get_forecast_data(lat, lon):
     )
     wave_data = requests.get(marine_url, timeout=10).json()
 
-    # Added uv_index to the API call
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
         f"&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code,uv_index"
@@ -380,18 +379,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart
-df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
-
-# Force Maximum Wave Height to fixed 2.0 meters (200 cm)
+# Smooth Wave Chart - Include all hours to show night continuity, but with spacing between days
 max_wave_m = 2.0
 
-# Generate 0-200 Y-axis labels with steps of 50
 if unit_sys == "metric":
     y_labels = [f"{v}" for v in range(200, -1, -50)]
     ax_unit = "cm"
 else:
-    # Convert steps of 50cm to feet
     y_labels = [f"{round((v/100)*3.28084, 1)}" for v in range(200, -1, -50)]
     ax_unit = "ft"
 
@@ -400,22 +394,40 @@ y_spans = "".join([f"<span>{lbl}</span>" for lbl in y_labels])
 def fmt_chart_tooltip(val, u_sys):
     if pd.isna(val): return "-"
     if u_sys == "metric":
-        # Always output cm consistently
         return f"{int(round(val * 100))} cm"
     else:
         return f"{round(val * 3.28084, 1)} ft"
 
+# Process all hours for the chart so night data is present
 points_data = []
-for _, row in df_chart.iterrows():
+prev_day_idx = None
+for _, row in df.iterrows():
     val = row["Wave Height (m)"]
     _, hex_color, _ = get_rating_details(row["Score"], is_dark)
+    current_day_idx = int(row["DayIdx"])
+    
+    # Insert a small night gap item if day changes
+    is_night_gap = False
+    if prev_day_idx is not None and current_day_idx != prev_day_idx:
+        points_data.append({
+            "isGap": True,
+            "day": row["Day"],
+            "dayIdx": current_day_idx
+        })
+    prev_day_idx = current_day_idx
+
+    hour_val = int(row["DateTime"].hour)
+    is_marked_hour = (hour_val in [6, 12, 17])
+
     points_data.append({
-        "time": row["Time"], "day": row["Day"], "hour": int(row["DateTime"].hour),
-        "dayIdx": int(row["DayIdx"]), "ratingColor": hex_color, "rating": f"{row['Score']}/10",
+        "isGap": False,
+        "time": row["Time"], "day": row["Day"], "hour": hour_val,
+        "dayIdx": current_day_idx, "ratingColor": hex_color, "rating": f"{row['Score']}/10",
         "wave": fmt_chart_tooltip(val, unit_sys), "swell": fmt_chart_tooltip(row["Swell (m)"], unit_sys), 
         "period": f"{round(row['Period (s)'],1)}s" if not pd.isna(row["Period (s)"]) else "-",
         "windSpeed": f"{round(row['Wind Speed (km/h)'],1)} km/h" if not pd.isna(row["Wind Speed (km/h)"]) else "-",
-        "waveRaw": 0.0 if pd.isna(val) else float(val)
+        "waveRaw": 0.0 if pd.isna(val) else float(val),
+        "isMarkedHour": is_marked_hour
     })
 
 html_chart = f"""
@@ -472,14 +484,31 @@ html_chart = f"""
     </div>
   </div>
   <script>
-    const points = {json.dumps(points_data)};
+    const rawPoints = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
     
-    // REDUCED stepX to 12 to make the graph more compact and days closer
-    const stepX = 12, padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
+    // Normal step vs night gap step
+    const normalStepX = 11;
+    const gapStepX = 22; // Wider step for night gap to prevent text overlap
+    const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
-    const plotHeight = 185 - padTop - padBottom;
-    const svgWidth = Math.max(400, padLeft + padRight + (points.length - 1) * stepX);
+    // Pre-calculate X coordinates with variable step widths for gaps
+    let currentX = padLeft;
+    const coords = rawPoints.map((p, i) => {{
+      if (p.isGap) {{
+        currentX += gapStepX;
+        return {{ ...p, x: currentX };}
+      }} else {{
+        if (i > 0) currentX += normalStepX;
+        return {{ 
+          ...p, 
+          x: currentX, 
+          y: padTop + (185 - padTop - padBottom) * (1 - Math.min(1, Math.max(0, p.waveRaw / maxWave))) 
+        }};
+      }}
+    }});
+    
+    const svgWidth = Math.max(400, currentX + padRight);
     const svg = document.getElementById("waveSvg");
     svg.setAttribute("width", svgWidth);
     
@@ -496,8 +525,7 @@ html_chart = f"""
       return el;
     }}
     
-    const coords = points.map((p, i) => ({{ ...p, x: padLeft + i * stepX, y: padTop + plotHeight * (1 - Math.min(1, Math.max(0, p.waveRaw / maxWave))) }}));
-    
+    // Draw Day dividing lines and headers
     let bandStart = 0;
     for (let i = 1; i <= coords.length; i++) {{
       if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
@@ -505,7 +533,7 @@ html_chart = f"""
         const x2 = i === coords.length ? svgWidth : (coords[i - 1].x + coords[i].x) / 2;
         
         if (bandStart > 0) {{
-          svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: padTop + plotHeight, stroke: "{grid_color}", "stroke-width": "1.5", "stroke-dasharray": "4,4" }}));
+          svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: 185 - padBottom, stroke: "{grid_color}", "stroke-width": "1.5", "stroke-dasharray": "4,4" }}));
         }}
         
         const midX = (x1 + x2) / 2;
@@ -517,30 +545,33 @@ html_chart = f"""
       }}
     }}
     
+    // Build path ignoring gap indicator objects for line drawing
+    const lineCoords = coords.filter(c => !c.isGap);
     let pathD = "";
-    coords.forEach((c, idx) => {{
+    lineCoords.forEach((c, idx) => {{
         if (idx === 0) pathD += `M ${{c.x}} ${{c.y}}`;
         else {{
-            const prev = coords[idx - 1]; const cpX = (prev.x + c.x) / 2;
+            const prev = lineCoords[idx - 1]; const cpX = (prev.x + c.x) / 2;
             pathD += ` C ${{cpX}} ${{prev.y}}, ${{cpX}} ${{c.y}}, ${{c.x}} ${{c.y}}`;
         }}
     }});
     
-    const fillD = pathD + ` L ${{coords[coords.length-1].x}} ${{padTop + plotHeight}} L ${{coords[0].x}} ${{padTop + plotHeight}} Z`;
-    svg.appendChild(createSvg("path", {{ d: fillD, fill: "url(#waveGrad)" }}));
-    svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "{chart_line}", "stroke-width": "3", "stroke-linecap": "round" }}));
+    const plotHeight = 185 - padTop - padBottom;
+    if (lineCoords.length > 0) {{
+      const fillD = pathD + ` L ${{lineCoords[lineCoords.length-1].x}} ${{padTop + plotHeight}} L ${{lineCoords[0].x}} ${{padTop + plotHeight}} Z`;
+      svg.appendChild(createSvg("path", {{ d: fillD, fill: "url(#waveGrad)" }}));
+      svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "{chart_line}", "stroke-width": "3", "stroke-linecap": "round" }}));
+    }}
     
+    // Draw markers only for marked hours (6, 12, 17)
     coords.forEach(c => {{
-      if (c.hour === 6 || c.hour === 12 || c.hour === 17) {{
-        // Red dot
+      if (!c.isGap && c.isMarkedHour) {{
         svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "4.5", fill: "{card_bg}", stroke: c.ratingColor, "stroke-width": "2.5" }}));
         
-        // Label above the dot (Wave Height)
         const waveLabel = createSvg("text", {{ x: c.x, y: c.y - 10, fill: "{text_color}", "font-size": "9", "font-weight": "800", "text-anchor": "middle" }});
-        waveLabel.textContent = c.wave.replace(' ', ''); // e.g. "40cm"
+        waveLabel.textContent = c.wave.replace(' ', '');
         svg.appendChild(waveLabel);
 
-        // Label below the line (Time)
         const timeLabel = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "{sub_text}", "font-size": "10", "font-weight": "700", "text-anchor": "middle" }});
         timeLabel.textContent = c.time.split(" ")[1];
         svg.appendChild(timeLabel);
@@ -557,7 +588,8 @@ html_chart = f"""
     let isBoxVisible = false;
     
     function showData(idx) {{
-      selectedIdx = idx; const c = coords[idx];
+      selectedIdx = idx; const c = lineCoords[idx];
+      if (!c) return;
       scrubLine.setAttribute("x1", c.x); scrubLine.setAttribute("x2", c.x); scrubLine.setAttribute("opacity", "0.5");
       activeDot.setAttribute("cx", c.x); activeDot.setAttribute("cy", c.y); activeDot.setAttribute("opacity", "1");
       
@@ -584,8 +616,8 @@ html_chart = f"""
 
     scrollArea.addEventListener("touchstart", (e) => {{
         if(e.touches.length !== 1) return;
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
+        startX = e.touches.length > 0 ? e.touches[0].clientX : 0;
+        startY = e.touches.length > 0 ? e.touches[0].clientY : 0;
         isDragging = false;
 
         if (isBoxVisible) {{
@@ -613,8 +645,14 @@ html_chart = f"""
         
         e.preventDefault();
         const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
-        const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
-        if (selectedIdx !== idx) showData(idx);
+        // Find closest lineCoord to relX
+        let closestIdx = 0;
+        let minDst = Infinity;
+        lineCoords.forEach((lc, lci) => {{
+            const dst = Math.abs(lc.x - relX);
+            if (dst < minDst) {{ minDst = dst; closestIdx = lci; }}
+        }});
+        if (selectedIdx !== closestIdx) showData(closestIdx);
     }}, {{passive: false}});
 
     scrollArea.addEventListener("touchend", () => {{
@@ -625,8 +663,13 @@ html_chart = f"""
     scrollArea.addEventListener("click", (e) => {{
         if (isDragging) return; 
         const relX = e.clientX - svg.getBoundingClientRect().left;
-        const idx = Math.min(coords.length - 1, Math.max(0, Math.round((relX - padLeft) / stepX)));
-        if (isBoxVisible && idx === selectedIdx) hideData(); else showData(idx);
+        let closestIdx = 0;
+        let minDst = Infinity;
+        lineCoords.forEach((lc, lci) => {{
+            const dst = Math.abs(lc.x - relX);
+            if (dst < minDst) {{ minDst = dst; closestIdx = lci; }}
+        }});
+        if (isBoxVisible && closestIdx === selectedIdx) hideData(); else showData(closestIdx);
     }});
   </script>
 </body>
@@ -641,18 +684,17 @@ def generate_html_rows(day_df, u_sys):
     for _, row in day_df.iterrows():
         time_str = row["HourStr"]
         
-        # Wave height dynamic coloring & formatting
         wv_m = row["Wave Height (m)"]
         if pd.isna(wv_m):
             wv_color = text_color
             surf_str = "Flat"
         else:
             if wv_m <= 0.6:
-                wv_color = "#DC2626" if not is_dark else "#EF4444"  # Red
+                wv_color = "#DC2626" if not is_dark else "#EF4444"
             elif wv_m <= 0.9:
-                wv_color = "#D97706" if not is_dark else "#F59E0B"  # Orange
+                wv_color = "#D97706" if not is_dark else "#F59E0B"
             else:
-                wv_color = "#16A34A" if not is_dark else "#22C55E"  # Green
+                wv_color = "#16A34A" if not is_dark else "#22C55E"
             
             if u_sys == "metric":
                 if wv_m < 1.0:
@@ -666,7 +708,6 @@ def generate_html_rows(day_df, u_sys):
             
         rt_txt, rt_col, rt_bg = get_rating_details(row["Score"], is_dark)
         
-        # Swell Info
         sw_m = row["Swell (m)"]
         sw_p = row["Period (s)"]
         
@@ -683,23 +724,19 @@ def generate_html_rows(day_df, u_sys):
                 
             swell_str = f"<span class='sf-val-main' style='font-size: 0.95rem; white-space: nowrap;'>{sw_display}</span> <span class='sf-val-sub'>{sw_p:.0f}s</span>"
         
-        # Wind Info
         w_spd = row["Wind Speed (km/h)"]
         w_dir = row["Wind Direction (°)"]
         wind_spd_str = f"{w_spd:.0f} <span class='sf-val-sub'>kph</span>" if not pd.isna(w_spd) else "-"
         arrow_deg = w_dir if not pd.isna(w_dir) else 0
 
-        # Weather & Air Temp Info
         air_t = row["Air Temp (°C)"]
         air_str = f"{air_t:.0f}°" if not pd.isna(air_t) else "-"
         w_code = row["Weather Code"]
         w_icon = get_weather_icon(w_code)
 
-        # Water Temp Info
         wat_t = row["Water Temp (°C)"]
         wat_str = f"💧 {wat_t:.1f}°" if not pd.isna(wat_t) else "-"
 
-        # UV Index Info
         uv_val = row["UV Index"]
         if pd.isna(uv_val):
             uv_html = "-"
@@ -707,12 +744,11 @@ def generate_html_rows(day_df, u_sys):
             uv_color = "#22C55E" if uv_val < 3 else ("#F59E0B" if uv_val < 6 else ("#EF4444" if uv_val < 8 else "#B91C1C"))
             uv_html = f'<span class="sf-val-main" style="color: {uv_color}; font-size: 0.95rem;">{uv_val:.0f}</span><br><span class="sf-val-sub">UV</span>'
 
-        # Single string with no indentation to avoid markdown code block rendering
         html += f'<div class="sf-row"><div class="sf-time">{time_str}</div><div class="sf-col">{surf_str}<br><div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div></div><div class="sf-col">{swell_str}</div><div class="sf-col"><div class="wind-arrow-container"><span class="sf-val-main">{wind_spd_str}</span><span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span></div></div><div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div><div class="sf-col sf-val-main">{wat_str}</div><div class="sf-col">{uv_html}</div></div>'
     return html
 
 
-# Only look at daylight hours
+# Only look at daylight hours for tables
 df_daylight = df[
     (df["DateTime"] >= (df["Sunrise"] - pd.Timedelta(minutes=30))) & 
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
@@ -774,7 +810,7 @@ for i, d in enumerate(unique_dates):
         subset = day_dl_df.iloc[(day_dl_df['DateTime'].dt.hour - target_h).abs().argsort()[:1]]
         if not subset.empty:
             row = subset.iloc[0].copy()
-            row["HourStr"] = label # Override time with label (e.g. 8:00 -> Morning)
+            row["HourStr"] = label
             summary_hours.append(row)
     
     summary_df = pd.DataFrame(summary_hours)
