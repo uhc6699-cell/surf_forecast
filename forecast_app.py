@@ -379,7 +379,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart - Include all hours to show night continuity, with a very compact night gap
+# Smooth Wave Chart - Include all hours to show night continuity, with a very minimal gap
 max_wave_m = 2.0
 
 if unit_sys == "metric":
@@ -485,7 +485,7 @@ html_chart = f"""
     const maxWave = {max_wave_m};
     
     const normalStepX = 11;
-    const gapStepX = 8; // Very compact gap between days
+    const gapStepX = 4; // Extremely compact gap between days
     const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
     let currentX = padLeft;
