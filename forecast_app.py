@@ -114,59 +114,49 @@ st.markdown(
         border-left: 4px solid {text_color};
     }}
     
-    /* Side-by-side Unit Switcher Styling (Left & Right) */
+    /* Layout fix for Columns - Forces items side-by-side on mobile */
     div[data-testid="stHorizontalBlock"] {{
-        display: flex !important;
-        justify-content: space-between !important;
+        flex-wrap: nowrap !important;
+        gap: 12px !important;
         align-items: center !important;
-        gap: 0px !important;
-        margin-bottom: 8px !important;
     }}
-    div[data-testid="stHorizontalBlock"] > div {{
-        width: 75px !important;
-        flex: 0 0 75px !important;
+    div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {{
+        min-width: 0 !important; 
     }}
-    div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {{
-        background-color: {"" + active_bg + "" if st.session_state.unit == "metric" else "" + inactive_bg + ""} !important;
-        border: 1px solid {text_color} !important;
-        color: {"" + active_fg + "" if st.session_state.unit == "metric" else "" + inactive_fg + ""} !important;
-    }}
-    div[data-testid="stHorizontalBlock"] > div:nth-child(1) button p {{
-        color: {"" + active_fg + "" if st.session_state.unit == "metric" else "" + inactive_fg + ""} !important;
-    }}
-    div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {{
-        background-color: {"" + active_bg + "" if st.session_state.unit == "imperial" else "" + inactive_bg + ""} !important;
-        border: 1px solid {text_color} !important;
-        color: {"" + active_fg + "" if st.session_state.unit == "imperial" else "" + inactive_fg + ""} !important;
-    }}
-    div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {{
-        color: {"" + active_fg + "" if st.session_state.unit == "imperial" else "" + inactive_fg + ""} !important;
-    }}
-    
+
+    /* Buttons Style for Unit Selector (Matched to Cams buttons) */
     div[data-testid="stButton"] button {{
         border-radius: 8px !important;
         font-weight: 600 !important;
-        min-height: 28px !important;
-        height: 28px !important;
-        padding: 0px 2px !important;
+        padding: 12px 10px !important;
+        height: auto !important;
+        min-height: 40px !important;
         width: 100% !important;
+        border: 1px solid {text_color} !important;
     }}
     div[data-testid="stButton"] button p {{
-        font-size: 0.8rem !important;
+        font-size: 0.85rem !important;
+        margin: 0 !important;
     }}
 
-    /* Surfline Style Table CSS with vertical dividers */
-    .sf-table-container {{
+    /* Horizontal Scroll Table Styles */
+    .sf-table-wrapper {{
         background: {card_bg};
         border-radius: 12px;
         border: 1px solid {border_color};
         margin-bottom: 4px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.02);
-        overflow: hidden;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }}
+    .sf-table-container {{
+        min-width: 600px; /* Forces Horizontal scroll */
+        display: flex;
+        flex-direction: column;
     }}
     .sf-header-row {{
         display: grid;
-        grid-template-columns: 0.8fr 1.2fr 1.5fr 1fr;
+        grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px;
         border-bottom: 1px solid {border_color};
         text-align: center;
         font-size: 0.75rem;
@@ -176,7 +166,7 @@ st.markdown(
     }}
     .sf-row {{
         display: grid;
-        grid-template-columns: 0.8fr 1.2fr 1.5fr 1fr;
+        grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px;
         border-bottom: 1px solid {border_color};
         align-items: stretch;
         text-align: center;
@@ -249,13 +239,14 @@ SPOTS = {
     "Haifa - Bat Galim": {"lat": 32.836, "lon": 34.978, "offshore": (130, 225), "onshore": (310, 45), "cam": "https://www.beachcam.co.il/batgalim.html"},
 }
 
-# Centered Spot Selector & Full-width Theme Toggle
-selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
-
-new_theme = st.toggle("🌙 Dark Mode", value=is_dark, key="theme_toggle")
-if new_theme != is_dark:
-    st.session_state.theme = "dark" if new_theme else "light"
-    st.rerun()
+col_spot, col_theme = st.columns([3, 1])
+with col_spot:
+    selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
+with col_theme:
+    new_theme = st.toggle("🌙 Dark Mode", value=is_dark, key="theme_toggle")
+    if new_theme != is_dark:
+        st.session_state.theme = "dark" if new_theme else "light"
+        st.rerun()
 
 spot = SPOTS[selected_spot_name]
 short_spot_name = selected_spot_name.split(" (")[0].split(" - ")[-1]
@@ -280,7 +271,7 @@ def get_forecast_data(lat, lon):
 
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-        f"&hourly=wind_speed_10m,wind_direction_10m"
+        f"&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code"
         f"&daily=sunrise,sunset&timezone=auto&forecast_days=7"
     )
     wind_data = requests.get(weather_url, timeout=10).json()
@@ -290,8 +281,11 @@ def get_forecast_data(lat, lon):
         "Wave Height (m)": wave_data["hourly"]["wave_height"],
         "Swell (m)": wave_data["hourly"]["swell_wave_height"],
         "Period (s)": wave_data["hourly"]["wave_period"],
+        "Water Temp (°C)": wave_data["hourly"]["sea_surface_temperature"],
         "Wind Speed (km/h)": wind_data["hourly"]["wind_speed_10m"],
         "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"],
+        "Air Temp (°C)": wind_data["hourly"]["temperature_2m"],
+        "Weather Code": wind_data["hourly"]["weather_code"],
     })
     df["Date"] = df["DateTime"].dt.date
     df["Day"] = df["DateTime"].dt.strftime("%a")
@@ -349,6 +343,18 @@ def get_rating_details(score, is_dark_theme):
     elif score >= 3.5:
         return "POOR", ("#F87171" if is_dark_theme else "#B91C1C"), "rgba(245, 101, 101, 0.15)"
     return "VERY POOR", ("#F87171" if is_dark_theme else "#B91C1C"), "rgba(245, 101, 101, 0.15)"
+
+def get_weather_icon(code):
+    if pd.isna(code): return ""
+    c = int(code)
+    if c == 0: return "☀️"
+    elif c in [1, 2]: return "⛅"
+    elif c == 3: return "☁️"
+    elif c in [45, 48]: return "🌫️"
+    elif c in [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82]: return "🌧️"
+    elif c in [71, 73, 75, 77, 85, 86]: return "❄️"
+    elif c in [95, 96, 99]: return "⛈️"
+    return "🌥️"
 
 df, daily_df, water_temp = get_forecast_data(spot["lat"], spot["lon"])
 unique_dates = sorted(df["Date"].unique())
@@ -680,8 +686,17 @@ def generate_html_rows(day_df, u_sys):
         w_spd = row["Wind Speed (km/h)"]
         w_dir = row["Wind Direction (°)"]
         wind_spd_str = f"{w_spd:.0f} <span class='sf-val-sub'>kph</span>" if not pd.isna(w_spd) else "-"
-        
         arrow_deg = w_dir if not pd.isna(w_dir) else 0
+
+        # Weather & Air Temp Info
+        air_t = row["Air Temp (°C)"]
+        air_str = f"{air_t:.0f}°" if not pd.isna(air_t) else "-"
+        w_code = row["Weather Code"]
+        w_icon = get_weather_icon(w_code)
+
+        # Water Temp Info
+        wat_t = row["Water Temp (°C)"]
+        wat_str = f"{wat_t:.1f}°" if not pd.isna(wat_t) else "-"
 
         html += f"""
         <div class="sf-row">
@@ -697,6 +712,8 @@ def generate_html_rows(day_df, u_sys):
                     <span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span>
                 </div>
             </div>
+            <div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div>
+            <div class="sf-col sf-val-main">{wat_str}</div>
         </div>
         """
     return html
@@ -708,7 +725,29 @@ df_daylight = df[
     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
 ].copy()
 
-# Render Two Compact Unit Buttons (Left & Right spread)
+# Inject Dynamic CSS to perfectly color our matched Left/Right buttons
+is_metric = (unit_sys == "metric")
+st.markdown(f"""
+<style>
+div[data-testid="stHorizontalBlock"] > div:nth-child(1) button {{
+    background-color: {"" + active_bg + "" if is_metric else "" + inactive_bg + ""} !important;
+    color: {"" + active_fg + "" if is_metric else "" + inactive_fg + ""} !important;
+}}
+div[data-testid="stHorizontalBlock"] > div:nth-child(1) button p {{
+    color: {"" + active_fg + "" if is_metric else "" + inactive_fg + ""} !important;
+}}
+
+div[data-testid="stHorizontalBlock"] > div:nth-child(2) button {{
+    background-color: {"" + active_bg + "" if not is_metric else "" + inactive_bg + ""} !important;
+    color: {"" + active_fg + "" if not is_metric else "" + inactive_fg + ""} !important;
+}}
+div[data-testid="stHorizontalBlock"] > div:nth-child(2) button p {{
+    color: {"" + active_fg + "" if not is_metric else "" + inactive_fg + ""} !important;
+}}
+</style>
+""", unsafe_allow_html=True)
+
+# Render Unit Buttons (Left & Right evenly)
 col_cm, col_ft = st.columns(2)
 
 with col_cm:
@@ -722,6 +761,7 @@ with col_ft:
         if unit_sys != "imperial":
             st.session_state.unit = "imperial"
             st.rerun()
+
 
 # Render Days
 for i, d in enumerate(unique_dates):
@@ -749,11 +789,13 @@ for i, d in enumerate(unique_dates):
     # Render Summary Table
     if not summary_df.empty:
         summary_html = f"""
-        <div class="sf-table-container">
-            <div class="sf-header-row">
-                <div></div><div>Surf</div><div>Swell</div><div>Wind</div>
+        <div class="sf-table-wrapper">
+            <div class="sf-table-container">
+                <div class="sf-header-row">
+                    <div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div>
+                </div>
+                {generate_html_rows(summary_df, unit_sys)}
             </div>
-            {generate_html_rows(summary_df, unit_sys)}
         </div>
         """
         st.markdown(summary_html, unsafe_allow_html=True)
@@ -761,8 +803,13 @@ for i, d in enumerate(unique_dates):
     # Hourly Expander
     with st.expander("Show all daylight hours"):
         hourly_html = f"""
-        <div class="sf-table-container" style="box-shadow: none; border: none; margin-bottom: 0;">
-            {generate_html_rows(day_dl_df, unit_sys)}
+        <div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;">
+            <div class="sf-table-container">
+                <div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div>
+                </div>
+                {generate_html_rows(day_dl_df, unit_sys)}
+            </div>
         </div>
         """
         st.markdown(hourly_html, unsafe_allow_html=True)
