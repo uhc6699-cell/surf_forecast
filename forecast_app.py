@@ -267,7 +267,6 @@ def get_forecast_data(lat, lon):
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # מנסים למשוך את הנתונים
             wave_response = requests.get(marine_url, timeout=15)
             wave_response.raise_for_status()
             wave_data = wave_response.json()
@@ -276,49 +275,15 @@ def get_forecast_data(lat, lon):
             weather_response.raise_for_status()
             wind_data = weather_response.json()
             
-            # אם הגענו לפה, הכל עבד פיקס - שוברים את הלולאה וממשיכים
             break
             
         except requests.exceptions.RequestException:
-            # אם יש שגיאה, מחכים 2 שניות ומנסים שוב (אלא אם זה הניסיון האחרון)
             if attempt < max_retries - 1:
                 time.sleep(2)
                 continue
             else:
                 st.warning("⏳ שרת הנתונים לא מגיב כרגע גם לאחר מספר ניסיונות. אנא רענן את העמוד מאוחר יותר.")
                 st.stop()
-
-    df = pd.DataFrame({
-        "DateTime": pd.to_datetime(wave_data["hourly"]["time"]),
-        "Wave Height (m)": wave_data["hourly"]["wave_height"],
-        "Swell (m)": wave_data["hourly"]["swell_wave_height"],
-        "Period (s)": wave_data["hourly"]["wave_period"],
-        "Water Temp (°C)": wave_data["hourly"]["sea_surface_temperature"],
-        "Wind Speed (km/h)": wind_data["hourly"]["wind_speed_10m"],
-        "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"],
-        "Air Temp (°C)": wind_data["hourly"]["temperature_2m"],
-        "Weather Code": wind_data["hourly"]["weather_code"],
-        "UV Index": wind_data["hourly"]["uv_index"],
-    })
-    df["Date"] = df["DateTime"].dt.date
-    df["Day"] = df["DateTime"].dt.strftime("%a")
-    df["HourStr"] = df["DateTime"].dt.strftime("%H:%M")
-    df["Time"] = df["DateTime"].dt.strftime("%a %H:00")
-
-    daily_df = pd.DataFrame({
-        "Date": pd.to_datetime(wind_data["daily"]["time"]).date,
-        "Sunrise": pd.to_datetime(wind_data["daily"]["sunrise"]),
-        "Sunset": pd.to_datetime(wind_data["daily"]["sunset"]),
-    })
-    
-    df = df.merge(daily_df, on="Date", how="left")
-
-    water_temp = wave_data.get("current", {}).get("sea_surface_temperature")
-    if water_temp is None:
-        sst_series = pd.Series(wave_data["hourly"].get("sea_surface_temperature", [])).dropna()
-        water_temp = float(sst_series.iloc[0]) if not sst_series.empty else None
-
-    return df, daily_df, water_temp
 
     df = pd.DataFrame({
         "DateTime": pd.to_datetime(wave_data["hourly"]["time"]),
@@ -433,7 +398,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Smooth Wave Chart - Include all hours to show night continuity, with a very minimal gap
+# Smooth Wave Chart 
 max_wave_m = 2.0
 
 if unit_sys == "metric":
@@ -455,7 +420,7 @@ def fmt_chart_tooltip(val, u_sys):
 points_data = []
 prev_day_idx = None
 
-# סינון: לוקחים נתון רק כל 3 שעות. זה מה שיהפוך את הגרף לחלק ועגול לחלוטין.
+# Filter: Take data only every 3 hours for a smooth, curvy line.
 df_chart = df[df["DateTime"].dt.hour % 3 == 0]
 
 for _, row in df_chart.iterrows():
@@ -472,7 +437,6 @@ for _, row in df_chart.iterrows():
     prev_day_idx = current_day_idx
 
     hour_val = int(row["DateTime"].hour)
-    # שינינו ל-18 במקום 17 כדי לקבל סימטריה מוחלטת על הגרף (6 בבוקר, 12 באמצע, 18 בערב)
     is_marked_hour = (hour_val in [6, 12, 18])
 
     points_data.append({
@@ -543,8 +507,8 @@ html_chart = f"""
     const rawPoints = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
     
-  const normalStepX = 21; // הגדלנו מ-7 ל-21 כי עכשיו יש פחות נקודות ביום
-    const gapStepX = 2;
+    const normalStepX = 21; 
+    const gapStepX = 2; 
     const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
     let currentX = padLeft;
@@ -552,21 +516,21 @@ html_chart = f"""
       if (p.isGap) {{
         currentX += gapStepX;
         return {{ ...p, x: currentX }};
-     }} else {{
+      }} else {{
         if (i > 0) currentX += normalStepX;
         return {{ 
           ...p, 
           x: currentX, 
-          /* שינוי: הוספנו 0.04 במקום 0 כדי לשמור על קצת נפח ויזואלי גם כשהגלים שטוחים */
           y: padTop + (185 - padTop - padBottom) * (1 - Math.min(1, Math.max(0.04, p.waveRaw / maxWave))) 
         }};
       }}
+    }});
     
     const svgWidth = Math.max(400, currentX + padRight);
     const svg = document.getElementById("waveSvg");
     svg.setAttribute("width", svgWidth);
     
-   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
     defs.innerHTML = `<linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="{chart_grad_top}" stop-opacity="0.85"/>
       <stop offset="100%" stop-color="{card_bg}" stop-opacity="0.15"/>
@@ -798,7 +762,6 @@ def generate_html_rows(day_df, u_sys):
     return html
 
 
-# Only look at daylight hours for tables
 # Only look at daylight hours for tables (Guaranteed to show at least 06:00 to 18:00)
 df_daylight = df[
     ((df["DateTime"] >= (df["Sunrise"] - pd.Timedelta(minutes=30))) & 
@@ -856,7 +819,6 @@ for i, d in enumerate(unique_dates):
 
     st.markdown(f'<div class="day-header">{day_title}</div>', unsafe_allow_html=True)
     
-    # Create Summary Data (Morning, Noon, Evening)
     # Create Summary Data (Morning, Noon, Evening) - הותאם ל-6, 12, 18
     summary_hours = []
     for label, target_h in [("Morning", 6), ("Noon", 12), ("Evening", 18)]:
