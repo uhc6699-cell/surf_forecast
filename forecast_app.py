@@ -150,13 +150,13 @@ st.markdown(
         -webkit-overflow-scrolling: touch;
     }}
     .sf-table-container {{
-        min-width: 600px; /* Forces Horizontal scroll */
+        min-width: 650px; /* Forces Horizontal scroll */
         display: flex;
         flex-direction: column;
     }}
     .sf-header-row {{
         display: grid;
-        grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px;
+        grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px 65px;
         border-bottom: 1px solid {border_color};
         text-align: center;
         font-size: 0.75rem;
@@ -166,7 +166,7 @@ st.markdown(
     }}
     .sf-row {{
         display: grid;
-        grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px;
+        grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px 65px;
         border-bottom: 1px solid {border_color};
         align-items: stretch;
         text-align: center;
@@ -259,9 +259,10 @@ def get_forecast_data(lat, lon):
     )
     wave_data = requests.get(marine_url, timeout=10).json()
 
+    # Added uv_index to the API call
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-        f"&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code"
+        f"&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code,uv_index"
         f"&daily=sunrise,sunset&timezone=auto&forecast_days=7"
     )
     wind_data = requests.get(weather_url, timeout=10).json()
@@ -276,6 +277,7 @@ def get_forecast_data(lat, lon):
         "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"],
         "Air Temp (°C)": wind_data["hourly"]["temperature_2m"],
         "Weather Code": wind_data["hourly"]["weather_code"],
+        "UV Index": wind_data["hourly"]["uv_index"],
     })
     df["Date"] = df["DateTime"].dt.date
     df["Day"] = df["DateTime"].dt.strftime("%a")
@@ -443,7 +445,7 @@ html_chart = f"""
   .chart-shell {{ display: flex; position: relative; width: 100%; height: 185px; }}
   .y-axis {{
     width: 35px; flex-shrink: 0; display: flex; flex-direction: column;
-    justify-content: space-between; padding: 14px 4px 34px 0; text-align: right;
+    justify-content: space-between; padding: 22px 4px 34px 0; text-align: right;
     font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1px solid {border_color};
     line-height: 1;
   }}
@@ -473,7 +475,8 @@ html_chart = f"""
     const points = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
     
-    const stepX = 21, padLeft = 14, padRight = 20, padTop = 18, padBottom = 38;
+    // REDUCED stepX to 12 to make the graph more compact and days closer
+    const stepX = 12, padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
     const plotHeight = 185 - padTop - padBottom;
     const svgWidth = Math.max(400, padLeft + padRight + (points.length - 1) * stepX);
@@ -506,7 +509,7 @@ html_chart = f"""
         }}
         
         const midX = (x1 + x2) / 2;
-        const dayLabel = createSvg("text", {{ x: midX, y: padTop + 2, fill: "{text_color}", "font-size": "11", "font-weight": "800", "text-anchor": "middle" }});
+        const dayLabel = createSvg("text", {{ x: midX, y: padTop - 10, fill: "{text_color}", "font-size": "11", "font-weight": "800", "text-anchor": "middle" }});
         dayLabel.textContent = coords[bandStart].day;
         svg.appendChild(dayLabel);
         
@@ -529,10 +532,18 @@ html_chart = f"""
     
     coords.forEach(c => {{
       if (c.hour === 6 || c.hour === 12 || c.hour === 17) {{
+        // Red dot
         svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "4.5", fill: "{card_bg}", stroke: c.ratingColor, "stroke-width": "2.5" }}));
-        const label = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "{sub_text}", "font-size": "10", "font-weight": "700", "text-anchor": "middle" }});
-        label.textContent = c.time.split(" ")[1];
-        svg.appendChild(label);
+        
+        // Label above the dot (Wave Height)
+        const waveLabel = createSvg("text", {{ x: c.x, y: c.y - 10, fill: "{text_color}", "font-size": "9", "font-weight": "800", "text-anchor": "middle" }});
+        waveLabel.textContent = c.wave.replace(' ', ''); // e.g. "40cm"
+        svg.appendChild(waveLabel);
+
+        // Label below the line (Time)
+        const timeLabel = createSvg("text", {{ x: c.x, y: padTop + plotHeight + 18, fill: "{sub_text}", "font-size": "10", "font-weight": "700", "text-anchor": "middle" }});
+        timeLabel.textContent = c.time.split(" ")[1];
+        svg.appendChild(timeLabel);
       }}
     }});
     
@@ -688,8 +699,16 @@ def generate_html_rows(day_df, u_sys):
         wat_t = row["Water Temp (°C)"]
         wat_str = f"💧 {wat_t:.1f}°" if not pd.isna(wat_t) else "-"
 
+        # UV Index Info
+        uv_val = row["UV Index"]
+        if pd.isna(uv_val):
+            uv_html = "-"
+        else:
+            uv_color = "#22C55E" if uv_val < 3 else ("#F59E0B" if uv_val < 6 else ("#EF4444" if uv_val < 8 else "#B91C1C"))
+            uv_html = f'<span class="sf-val-main" style="color: {uv_color}; font-size: 0.95rem;">{uv_val:.0f}</span><br><span class="sf-val-sub">UV</span>'
+
         # Single string with no indentation to avoid markdown code block rendering
-        html += f'<div class="sf-row"><div class="sf-time">{time_str}</div><div class="sf-col">{surf_str}<br><div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div></div><div class="sf-col">{swell_str}</div><div class="sf-col"><div class="wind-arrow-container"><span class="sf-val-main">{wind_spd_str}</span><span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span></div></div><div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div><div class="sf-col sf-val-main">{wat_str}</div></div>'
+        html += f'<div class="sf-row"><div class="sf-time">{time_str}</div><div class="sf-col">{surf_str}<br><div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div></div><div class="sf-col">{swell_str}</div><div class="sf-col"><div class="wind-arrow-container"><span class="sf-val-main">{wind_spd_str}</span><span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span></div></div><div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div><div class="sf-col sf-val-main">{wat_str}</div><div class="sf-col">{uv_html}</div></div>'
     return html
 
 
@@ -760,12 +779,12 @@ for i, d in enumerate(unique_dates):
     
     summary_df = pd.DataFrame(summary_hours)
     
-    # Render Summary Table - Built as single line string to avoid markdown parsing bugs
+    # Render Summary Table
     if not summary_df.empty:
-        summary_html = f'<div class="sf-table-wrapper"><div class="sf-table-container"><div class="sf-header-row"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div></div>{generate_html_rows(summary_df, unit_sys)}</div></div>'
+        summary_html = f'<div class="sf-table-wrapper"><div class="sf-table-container"><div class="sf-header-row"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div><div>UV</div></div>{generate_html_rows(summary_df, unit_sys)}</div></div>'
         st.markdown(summary_html, unsafe_allow_html=True)
 
     # Hourly Expander
     with st.expander("Show all daylight hours"):
-        hourly_html = f'<div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;"><div class="sf-table-container"><div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div></div>{generate_html_rows(day_dl_df, unit_sys)}</div></div>'
+        hourly_html = f'<div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;"><div class="sf-table-container"><div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div><div>UV</div></div>{generate_html_rows(day_dl_df, unit_sys)}</div></div>'
         st.markdown(hourly_html, unsafe_allow_html=True)
