@@ -384,13 +384,13 @@ df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
 # Force Maximum Wave Height to fixed 2.0 meters (200 cm)
 max_wave_m = 2.0
 
-# Generate 0-200 Y-axis labels
+# Generate 0-200 Y-axis labels with steps of 50
 if unit_sys == "metric":
-    y_labels = [f"{v}" for v in range(200, -1, -20)]
+    y_labels = [f"{v}" for v in range(200, -1, -50)]
     ax_unit = "cm"
 else:
-    # Convert 0-200cm steps to feet
-    y_labels = [f"{round((v/100)*3.28084, 1)}" for v in range(200, -1, -20)]
+    # Convert steps of 50cm to feet
+    y_labels = [f"{round((v/100)*3.28084, 1)}" for v in range(200, -1, -50)]
     ax_unit = "ft"
 
 y_spans = "".join([f"<span>{lbl}</span>" for lbl in y_labels])
