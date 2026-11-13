@@ -4,6 +4,7 @@ import streamlit.components.v1 as components
 import requests
 import pandas as pd
 import datetime
+import time
 
 # Initialize Theme & Unit State
 if "theme" not in st.session_state:
@@ -263,19 +264,61 @@ def get_forecast_data(lat, lon):
         f"&daily=sunrise,sunset&timezone=auto&forecast_days=7"
     )
     
-    try:
-        # העלינו את ה-timeout ל-20 שניות
-        wave_response = requests.get(marine_url, timeout=20)
-        wave_response.raise_for_status()
-        wave_data = wave_response.json()
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # מנסים למשוך את הנתונים
+            wave_response = requests.get(marine_url, timeout=15)
+            wave_response.raise_for_status()
+            wave_data = wave_response.json()
 
-        weather_response = requests.get(weather_url, timeout=20)
-        weather_response.raise_for_status()
-        wind_data = weather_response.json()
-    except requests.exceptions.RequestException:
-        # במקרה של שגיאה - נציג הודעה יפה ונעצור בלי לקרוס
-        st.warning("⏳ השרת של מזג האוויר עמוס כרגע או שזמן הבקשה פג. אנא רענן את העמוד בעוד מספר שניות.")
-        st.stop()
+            weather_response = requests.get(weather_url, timeout=15)
+            weather_response.raise_for_status()
+            wind_data = weather_response.json()
+            
+            # אם הגענו לפה, הכל עבד פיקס - שוברים את הלולאה וממשיכים
+            break
+            
+        except requests.exceptions.RequestException:
+            # אם יש שגיאה, מחכים 2 שניות ומנסים שוב (אלא אם זה הניסיון האחרון)
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            else:
+                st.warning("⏳ שרת הנתונים לא מגיב כרגע גם לאחר מספר ניסיונות. אנא רענן את העמוד מאוחר יותר.")
+                st.stop()
+
+    df = pd.DataFrame({
+        "DateTime": pd.to_datetime(wave_data["hourly"]["time"]),
+        "Wave Height (m)": wave_data["hourly"]["wave_height"],
+        "Swell (m)": wave_data["hourly"]["swell_wave_height"],
+        "Period (s)": wave_data["hourly"]["wave_period"],
+        "Water Temp (°C)": wave_data["hourly"]["sea_surface_temperature"],
+        "Wind Speed (km/h)": wind_data["hourly"]["wind_speed_10m"],
+        "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"],
+        "Air Temp (°C)": wind_data["hourly"]["temperature_2m"],
+        "Weather Code": wind_data["hourly"]["weather_code"],
+        "UV Index": wind_data["hourly"]["uv_index"],
+    })
+    df["Date"] = df["DateTime"].dt.date
+    df["Day"] = df["DateTime"].dt.strftime("%a")
+    df["HourStr"] = df["DateTime"].dt.strftime("%H:%M")
+    df["Time"] = df["DateTime"].dt.strftime("%a %H:00")
+
+    daily_df = pd.DataFrame({
+        "Date": pd.to_datetime(wind_data["daily"]["time"]).date,
+        "Sunrise": pd.to_datetime(wind_data["daily"]["sunrise"]),
+        "Sunset": pd.to_datetime(wind_data["daily"]["sunset"]),
+    })
+    
+    df = df.merge(daily_df, on="Date", how="left")
+
+    water_temp = wave_data.get("current", {}).get("sea_surface_temperature")
+    if water_temp is None:
+        sst_series = pd.Series(wave_data["hourly"].get("sea_surface_temperature", [])).dropna()
+        water_temp = float(sst_series.iloc[0]) if not sst_series.empty else None
+
+    return df, daily_df, water_temp
 
     df = pd.DataFrame({
         "DateTime": pd.to_datetime(wave_data["hourly"]["time"]),
