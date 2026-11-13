@@ -552,15 +552,15 @@ html_chart = f"""
       if (p.isGap) {{
         currentX += gapStepX;
         return {{ ...p, x: currentX }};
-      }} else {{
+     } else {
         if (i > 0) currentX += normalStepX;
-        return {{ 
+        return { 
           ...p, 
           x: currentX, 
-          y: padTop + (185 - padTop - padBottom) * (1 - Math.min(1, Math.max(0, p.waveRaw / maxWave))) 
-        }};
-      }}
-    }});
+          /* שינוי: הוספנו 0.04 במקום 0 כדי לשמור על קצת נפח ויזואלי גם כשהגלים שטוחים */
+          y: padTop + (185 - padTop - padBottom) * (1 - Math.min(1, Math.max(0.04, p.waveRaw / maxWave))) 
+        };
+      }
     
     const svgWidth = Math.max(400, currentX + padRight);
     const svg = document.getElementById("waveSvg");
@@ -799,9 +799,11 @@ def generate_html_rows(day_df, u_sys):
 
 
 # Only look at daylight hours for tables
+# Only look at daylight hours for tables (Guaranteed to show at least 06:00 to 18:00)
 df_daylight = df[
-    (df["DateTime"] >= (df["Sunrise"] - pd.Timedelta(minutes=30))) & 
-    (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))
+    ((df["DateTime"] >= (df["Sunrise"] - pd.Timedelta(minutes=30))) & 
+     (df["DateTime"] <= (df["Sunset"] + pd.Timedelta(minutes=30)))) |
+    ((df["DateTime"].dt.hour >= 6) & (df["DateTime"].dt.hour <= 18))
 ].copy()
 
 # Inject Dynamic CSS to perfectly color our matched Left/Right unit buttons
