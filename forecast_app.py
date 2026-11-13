@@ -253,12 +253,11 @@ st.markdown(
 
 @st.cache_data(ttl=1800)
 def get_forecast_data(lat, lon):
-    # הוספנו את המודלים האירופאים והמתקדמים לדיוק בים התיכון (אפשרות 1)
+    # הוסר הקישור למודלים הספציפיים שגרמו לתקיעה, וחזרנו לברירת המחדל היציבה של השרת
     marine_url = (
         f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}"
         f"&hourly=wave_height,wave_period,swell_wave_height,sea_surface_temperature"
         f"&current=sea_surface_temperature&timezone=auto&forecast_days=7"
-        f"&models=icon_wave,copernicus_marine"
     )
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
