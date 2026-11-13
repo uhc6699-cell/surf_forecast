@@ -257,14 +257,23 @@ def get_forecast_data(lat, lon):
         f"&hourly=wave_height,wave_period,swell_wave_height,sea_surface_temperature"
         f"&current=sea_surface_temperature&timezone=auto&forecast_days=7"
     )
-    wave_data = requests.get(marine_url, timeout=10).json()
-
     weather_url = (
         f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
         f"&hourly=wind_speed_10m,wind_direction_10m,temperature_2m,weather_code,uv_index"
         f"&daily=sunrise,sunset&timezone=auto&forecast_days=7"
     )
-    wind_data = requests.get(weather_url, timeout=10).json()
+    
+    try:
+        wave_response = requests.get(marine_url, timeout=20)
+        wave_response.raise_for_status()
+        wave_data = wave_response.json()
+
+        weather_response = requests.get(weather_url, timeout=20)
+        weather_response.raise_for_status()
+        wind_data = weather_response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"שגיאת תקשורת מול שרת הנתונים (Timeout/Network Error): {e}")
+        st.stop()
 
     df = pd.DataFrame({
         "DateTime": pd.to_datetime(wave_data["hourly"]["time"]),
@@ -485,7 +494,7 @@ html_chart = f"""
     const maxWave = {max_wave_m};
     
     const normalStepX = 11;
-    const gapStepX = 4; // Extremely compact gap between days
+    const gapStepX = 4;
     const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
     let currentX = padLeft;
