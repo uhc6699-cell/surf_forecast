@@ -552,15 +552,15 @@ html_chart = f"""
       if (p.isGap) {{
         currentX += gapStepX;
         return {{ ...p, x: currentX }};
-     } else {
+     }} else {{
         if (i > 0) currentX += normalStepX;
-        return { 
+        return {{ 
           ...p, 
           x: currentX, 
           /* שינוי: הוספנו 0.04 במקום 0 כדי לשמור על קצת נפח ויזואלי גם כשהגלים שטוחים */
           y: padTop + (185 - padTop - padBottom) * (1 - Math.min(1, Math.max(0.04, p.waveRaw / maxWave))) 
-        };
-      }
+        }};
+      }}
     
     const svgWidth = Math.max(400, currentX + padRight);
     const svg = document.getElementById("waveSvg");
