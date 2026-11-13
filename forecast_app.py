@@ -487,17 +487,15 @@ html_chart = f"""
     const rawPoints = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
     
-    // Normal step vs night gap step
     const normalStepX = 11;
-    const gapStepX = 22; // Wider step for night gap to prevent text overlap
+    const gapStepX = 22;
     const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
-    // Pre-calculate X coordinates with variable step widths for gaps
     let currentX = padLeft;
     const coords = rawPoints.map((p, i) => {{
       if (p.isGap) {{
         currentX += gapStepX;
-        return {{ ...p, x: currentX };}
+        return {{ ...p, x: currentX }};
       }} else {{
         if (i > 0) currentX += normalStepX;
         return {{ 
@@ -525,7 +523,6 @@ html_chart = f"""
       return el;
     }}
     
-    // Draw Day dividing lines and headers
     let bandStart = 0;
     for (let i = 1; i <= coords.length; i++) {{
       if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
@@ -545,7 +542,6 @@ html_chart = f"""
       }}
     }}
     
-    // Build path ignoring gap indicator objects for line drawing
     const lineCoords = coords.filter(c => !c.isGap);
     let pathD = "";
     lineCoords.forEach((c, idx) => {{
@@ -563,7 +559,6 @@ html_chart = f"""
       svg.appendChild(createSvg("path", {{ d: pathD, fill: "none", stroke: "{chart_line}", "stroke-width": "3", "stroke-linecap": "round" }}));
     }}
     
-    // Draw markers only for marked hours (6, 12, 17)
     coords.forEach(c => {{
       if (!c.isGap && c.isMarkedHour) {{
         svg.appendChild(createSvg("circle", {{ cx: c.x, cy: c.y, r: "4.5", fill: "{card_bg}", stroke: c.ratingColor, "stroke-width": "2.5" }}));
@@ -645,7 +640,6 @@ html_chart = f"""
         
         e.preventDefault();
         const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
-        // Find closest lineCoord to relX
         let closestIdx = 0;
         let minDst = Infinity;
         lineCoords.forEach((lc, lci) => {{
