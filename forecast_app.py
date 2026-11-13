@@ -124,7 +124,7 @@ st.markdown(
         min-width: 0 !important; 
     }}
 
-    /* Buttons Style for Unit Selector (Matched to Cams buttons) */
+    /* Buttons Style for Unit Selector */
     div[data-testid="stButton"] button {{
         border-radius: 8px !important;
         font-weight: 600 !important;
@@ -230,7 +230,7 @@ SPOTS = {
     "Haifa - Bat Galim": {"lat": 32.836, "lon": 34.978, "offshore": (130, 225), "onshore": (310, 45), "cam": "https://www.beachcam.co.il/batgalim.html"},
 }
 
-# Centered Spot Selector & Dark Mode Toggle (Sequential to keep Selectbox full width)
+# Centered Spot Selector & Dark Mode Toggle
 selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
 new_theme = st.toggle("Dark Mode", value=is_dark, key="theme_toggle")
 
@@ -380,29 +380,28 @@ st.markdown(
 
 # Smooth Wave Chart
 df_chart = df[df["DateTime"].dt.hour.between(6, 17)].copy()
-max_wave_m = float(df_chart["Wave Height (m)"].max())
-if pd.isna(max_wave_m) or max_wave_m <= 0: max_wave_m = 1.0
 
-def fmt_chart_y(val, u_sys):
-    if pd.isna(val): return "-"
-    if u_sys == "metric":
-        if val < 1.0: return f"{int(round(val * 100))} cm"
-        else: return f"{val:.1f} m"
-    else:
-        return f"{round(val * 3.28084, 1)} ft"
+# Force Maximum Wave Height to fixed 2.0 meters (200 cm)
+max_wave_m = 2.0
+
+# Generate 0-200 Y-axis labels
+if unit_sys == "metric":
+    y_labels = [f"{v}" for v in range(200, -1, -20)]
+    ax_unit = "cm"
+else:
+    # Convert 0-200cm steps to feet
+    y_labels = [f"{round((v/100)*3.28084, 1)}" for v in range(200, -1, -20)]
+    ax_unit = "ft"
+
+y_spans = "".join([f"<span>{lbl}</span>" for lbl in y_labels])
 
 def fmt_chart_tooltip(val, u_sys):
     if pd.isna(val): return "-"
     if u_sys == "metric":
-        if val < 1.0: return f"{int(round(val * 100))}cm"
-        else: return f"{val:.1f}m"
+        # Always output cm consistently
+        return f"{int(round(val * 100))} cm"
     else:
-        return f"{round(val * 3.28084, 1)}ft"
-
-y_top = fmt_chart_y(max_wave_m, unit_sys)
-y_3q = fmt_chart_y(max_wave_m * 0.75, unit_sys)
-y_mid = fmt_chart_y(max_wave_m * 0.5, unit_sys)
-y_1q = fmt_chart_y(max_wave_m * 0.25, unit_sys)
+        return f"{round(val * 3.28084, 1)} ft"
 
 points_data = []
 for _, row in df_chart.iterrows():
@@ -443,9 +442,10 @@ html_chart = f"""
   
   .chart-shell {{ display: flex; position: relative; width: 100%; height: 185px; }}
   .y-axis {{
-    width: 65px; flex-shrink: 0; display: flex; flex-direction: column;
-    justify-content: space-between; padding: 15px 6px 35px 0; text-align: right;
+    width: 35px; flex-shrink: 0; display: flex; flex-direction: column;
+    justify-content: space-between; padding: 14px 4px 34px 0; text-align: right;
     font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1px solid {border_color};
+    line-height: 1;
   }}
   .scroll-area {{
     flex: 1; overflow-x: auto; overflow-y: hidden; touch-action: pan-x pan-y;
@@ -456,13 +456,13 @@ html_chart = f"""
 <body oncontextmenu="return false;">
   <div class="chart-card" id="chartCard">
     <div class="c-header">
-      <div class="c-title">Wave Height</div>
+      <div class="c-title">Wave Height ({ax_unit})</div>
       <div class="hint-badge">Long Press to Drag</div>
     </div>
     <div class="data-box" id="dataBox"></div>
     <div class="chart-shell">
       <div class="y-axis">
-        <span>{y_top}</span><span>{y_3q}</span><span>{y_mid}</span><span>{y_1q}</span><span>0</span>
+        {y_spans}
       </div>
       <div class="scroll-area" id="scrollArea">
         <svg id="waveSvg" height="185"></svg>
