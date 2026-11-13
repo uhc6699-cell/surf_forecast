@@ -688,24 +688,8 @@ def generate_html_rows(day_df, u_sys):
         wat_t = row["Water Temp (°C)"]
         wat_str = f"💧 {wat_t:.1f}°" if not pd.isna(wat_t) else "-"
 
-        html += f"""
-        <div class="sf-row">
-            <div class="sf-time">{time_str}</div>
-            <div class="sf-col">
-                {surf_str}<br>
-                <div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div>
-            </div>
-            <div class="sf-col">{swell_str}</div>
-            <div class="sf-col">
-                <div class="wind-arrow-container">
-                    <span class="sf-val-main">{wind_spd_str}</span>
-                    <span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span>
-                </div>
-            </div>
-            <div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div>
-            <div class="sf-col sf-val-main">{wat_str}</div>
-        </div>
-        """
+        # Single string with no indentation to avoid markdown code block rendering
+        html += f'<div class="sf-row"><div class="sf-time">{time_str}</div><div class="sf-col">{surf_str}<br><div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div></div><div class="sf-col">{swell_str}</div><div class="sf-col"><div class="wind-arrow-container"><span class="sf-val-main">{wind_spd_str}</span><span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span></div></div><div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div><div class="sf-col sf-val-main">{wat_str}</div></div>'
     return html
 
 
@@ -776,30 +760,12 @@ for i, d in enumerate(unique_dates):
     
     summary_df = pd.DataFrame(summary_hours)
     
-    # Render Summary Table
+    # Render Summary Table - Built as single line string to avoid markdown parsing bugs
     if not summary_df.empty:
-        summary_html = f"""
-        <div class="sf-table-wrapper">
-            <div class="sf-table-container">
-                <div class="sf-header-row">
-                    <div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div>
-                </div>
-                {generate_html_rows(summary_df, unit_sys)}
-            </div>
-        </div>
-        """
+        summary_html = f'<div class="sf-table-wrapper"><div class="sf-table-container"><div class="sf-header-row"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div></div>{generate_html_rows(summary_df, unit_sys)}</div></div>'
         st.markdown(summary_html, unsafe_allow_html=True)
 
     # Hourly Expander
     with st.expander("Show all daylight hours"):
-        hourly_html = f"""
-        <div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;">
-            <div class="sf-table-container">
-                <div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
-                    <div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div>
-                </div>
-                {generate_html_rows(day_dl_df, unit_sys)}
-            </div>
-        </div>
-        """
+        hourly_html = f'<div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;"><div class="sf-table-container"><div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div></div>{generate_html_rows(day_dl_df, unit_sys)}</div></div>'
         st.markdown(hourly_html, unsafe_allow_html=True)
