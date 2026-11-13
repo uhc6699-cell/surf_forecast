@@ -49,7 +49,7 @@ st.markdown(
         color: {text_color} !important;
     }}
     .block-container {{
-        padding: 0.5rem 1rem 80px 1rem !important;
+        padding: 0.5rem 1rem 30px 1rem !important;
     }}
     header[data-testid="stHeader"] {{display: none;}}
     #MainMenu {{visibility: hidden;}}
@@ -154,6 +154,16 @@ st.markdown(
         display: flex;
         flex-direction: column;
     }}
+    .sf-header-row {{
+        display: grid;
+        grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px;
+        border-bottom: 1px solid {border_color};
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: {sub_text};
+        background: {db_cell_bg};
+    }}
     .sf-row {{
         display: grid;
         grid-template-columns: 60px 1.2fr 1.3fr 1fr 90px 75px;
@@ -164,14 +174,14 @@ st.markdown(
     .sf-row:last-child {{ border-bottom: none; }}
     
     /* Vertical Dividers */
-    .sf-row > div {{
+    .sf-header-row > div, .sf-row > div {{
         padding: 10px 4px;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
     }}
-    .sf-row > div:not(:last-child) {{
+    .sf-header-row > div:not(:last-child), .sf-row > div:not(:last-child) {{
         border-right: 1px solid {border_color};
     }}
     
@@ -189,15 +199,6 @@ st.markdown(
         font-size: 0.95rem; font-weight: 800; color: {text_color};
     }}
     .wind-arrow {{ display: inline-block; font-size: 1rem; }}
-    
-    .bottom-nav {{
-        position: fixed; bottom: 0; left: 0; right: 0; height: 75px;
-        background: {card_bg}; border-top: 1px solid {border_color};
-        display: flex; justify-content: space-around; align-items: center;
-        z-index: 9999; padding-bottom: env(safe-area-inset-bottom);
-    }}
-    .nav-icon {{ font-size: 24px; color: {sub_text}; }}
-    .nav-icon.active {{ color: {text_color}; }}
     
     /* Clean up Streamlit Expander */
     [data-testid="stExpander"] {{ border: none !important; box-shadow: none !important; background: transparent !important; margin-top: 0px; margin-bottom: 20px; }}
@@ -231,7 +232,7 @@ SPOTS = {
 
 # Centered Spot Selector & Dark Mode Toggle (Sequential to keep Selectbox full width)
 selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
-new_theme = st.toggle("🌙 Dark Mode", value=is_dark, key="theme_toggle")
+new_theme = st.toggle("Dark Mode", value=is_dark, key="theme_toggle")
 
 if new_theme != is_dark:
     st.session_state.theme = "dark" if new_theme else "light"
@@ -775,36 +776,30 @@ for i, d in enumerate(unique_dates):
     
     summary_df = pd.DataFrame(summary_hours)
     
-    # Render Summary Table without header row
+    # Render Summary Table
     if not summary_df.empty:
         summary_html = f"""
         <div class="sf-table-wrapper">
             <div class="sf-table-container">
+                <div class="sf-header-row">
+                    <div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div>
+                </div>
                 {generate_html_rows(summary_df, unit_sys)}
             </div>
         </div>
         """
         st.markdown(summary_html, unsafe_allow_html=True)
 
-    # Hourly Expander without header row
+    # Hourly Expander
     with st.expander("Show all daylight hours"):
         hourly_html = f"""
         <div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;">
             <div class="sf-table-container">
+                <div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                    <div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div>
+                </div>
                 {generate_html_rows(day_dl_df, unit_sys)}
             </div>
         </div>
         """
         st.markdown(hourly_html, unsafe_allow_html=True)
-
-st.markdown(
-    """
-    <div class="bottom-nav">
-        <div class="nav-icon active">🏠</div>
-        <div class="nav-icon">🧭</div>
-        <div class="nav-icon">🔔</div>
-        <div class="nav-icon">⚙️</div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
