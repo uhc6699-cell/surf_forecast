@@ -566,10 +566,10 @@ html_chart = f"""
     const svg = document.getElementById("waveSvg");
     svg.setAttribute("width", svgWidth);
     
-    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+   const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
     defs.innerHTML = `<linearGradient id="waveGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="{chart_grad_top}" stop-opacity="0.4"/>
-      <stop offset="100%" stop-color="{card_bg}" stop-opacity="0.0"/>
+      <stop offset="0%" stop-color="{chart_grad_top}" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="{card_bg}" stop-opacity="0.15"/>
     </linearGradient>`;
     svg.appendChild(defs);
     
@@ -855,8 +855,9 @@ for i, d in enumerate(unique_dates):
     st.markdown(f'<div class="day-header">{day_title}</div>', unsafe_allow_html=True)
     
     # Create Summary Data (Morning, Noon, Evening)
+    # Create Summary Data (Morning, Noon, Evening) - הותאם ל-6, 12, 18
     summary_hours = []
-    for label, target_h in [("Morning", 8), ("Noon", 13), ("Evening", 17)]:
+    for label, target_h in [("Morning", 6), ("Noon", 12), ("Evening", 18)]:
         subset = day_dl_df.iloc[(day_dl_df['DateTime'].dt.hour - target_h).abs().argsort()[:1]]
         if not subset.empty:
             row = subset.iloc[0].copy()
@@ -870,7 +871,8 @@ for i, d in enumerate(unique_dates):
         summary_html = f'<div class="sf-table-wrapper"><div class="sf-table-container"><div class="sf-header-row"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div><div>UV</div></div>{generate_html_rows(summary_df, unit_sys)}</div></div>'
         st.markdown(summary_html, unsafe_allow_html=True)
 
-    # Hourly Expander
+    # Hourly Expander - סינון מ-6 בבוקר ובקפיצות של 3 שעות
     with st.expander("Show all daylight hours"):
-        hourly_html = f'<div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;"><div class="sf-table-container"><div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div><div>UV</div></div>{generate_html_rows(day_dl_df, unit_sys)}</div></div>'
+        expander_df = day_dl_df[(day_dl_df['DateTime'].dt.hour >= 6) & (day_dl_df['DateTime'].dt.hour % 3 == 0)]
+        hourly_html = f'<div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;"><div class="sf-table-container"><div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div><div>UV</div></div>{generate_html_rows(expander_df, unit_sys)}</div></div>'
         st.markdown(hourly_html, unsafe_allow_html=True)
