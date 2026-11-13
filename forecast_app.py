@@ -454,7 +454,11 @@ def fmt_chart_tooltip(val, u_sys):
 
 points_data = []
 prev_day_idx = None
-for _, row in df.iterrows():
+
+# סינון: לוקחים נתון רק כל 3 שעות. זה מה שיהפוך את הגרף לחלק ועגול לחלוטין.
+df_chart = df[df["DateTime"].dt.hour % 3 == 0]
+
+for _, row in df_chart.iterrows():
     val = row["Wave Height (m)"]
     _, hex_color, _ = get_rating_details(row["Score"], is_dark)
     current_day_idx = int(row["DayIdx"])
@@ -468,7 +472,8 @@ for _, row in df.iterrows():
     prev_day_idx = current_day_idx
 
     hour_val = int(row["DateTime"].hour)
-    is_marked_hour = (hour_val in [6, 12, 17])
+    # שינינו ל-18 במקום 17 כדי לקבל סימטריה מוחלטת על הגרף (6 בבוקר, 12 באמצע, 18 בערב)
+    is_marked_hour = (hour_val in [6, 12, 18])
 
     points_data.append({
         "isGap": False,
@@ -538,7 +543,7 @@ html_chart = f"""
     const rawPoints = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
     
-   const normalStepX = 7; 
+  const normalStepX = 21; // הגדלנו מ-7 ל-21 כי עכשיו יש פחות נקודות ביום
     const gapStepX = 2;
     const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
