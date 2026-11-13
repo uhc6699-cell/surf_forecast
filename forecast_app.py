@@ -538,8 +538,8 @@ html_chart = f"""
     const rawPoints = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
     
-    const normalStepX = 11;
-    const gapStepX = 4;
+   const normalStepX = 7; 
+    const gapStepX = 2;
     const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
     
     let currentX = padLeft;
