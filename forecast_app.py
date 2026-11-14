@@ -257,13 +257,13 @@ st.markdown(
     .sf-row > div:nth-child(2) {{
         padding-left: 0 !important;
         padding-right: 0 !important;
+        background: {wave_badge_bg};
     }}
     .wave-height-badge {{
         display: block;
         width: 100%;
         box-sizing: border-box;
-        background: {wave_badge_bg};
-        border-radius: 6px;
+        background: transparent;
         padding: 10px 4px;
         line-height: 1.15;
         text-align: center;
