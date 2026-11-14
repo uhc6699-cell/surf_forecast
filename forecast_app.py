@@ -36,6 +36,7 @@ chart_line = "#38BDF8" if is_dark else "#1A2B4C"
 chart_grad_top = "#38BDF8" if is_dark else "#8997A8"
 grid_color = "#334155" if is_dark else "#CBD5E1"
 db_cell_bg = "#0F172A" if is_dark else "#F9FAFB"
+wave_badge_bg = "rgba(26, 43, 76, 0.24)" if is_dark else "rgba(26, 43, 76, 0.10)"
 
 active_bg = text_color
 active_fg = bg_color
@@ -253,6 +254,14 @@ st.markdown(
     .sf-val-main {{ font-size: 0.95rem; font-weight: 800; margin-bottom: 2px; }}
     .sf-val-sub {{ font-size: 0.75rem; font-weight: 600; color: {text_color}; }}
     
+    .wave-height-badge {{
+        display: inline-block;
+        background: {wave_badge_bg};
+        border: 1px solid rgba(26, 43, 76, 0.16);
+        border-radius: 6px;
+        padding: 3px 7px;
+        line-height: 1.15;
+    }}
     .rating-badge {{
         display: inline-block; font-size: 0.65rem; font-weight: 800;
         padding: 2px 6px; border-radius: 4px; margin-top: 4px; text-transform: uppercase;
@@ -857,7 +866,7 @@ def generate_html_rows(day_df, u_sys):
             else:
                 display_text = f"{round(wv_m * 3.28084, 1)}ft"
                 
-            surf_str = f"<span class='sf-val-main' style='color: {wv_color}; font-size: 0.95rem; white-space: nowrap;'>{display_text}</span>"
+            surf_str = f"<span class='sf-val-main wave-height-badge' style='color: {wv_color} !important; font-size: 0.95rem; white-space: nowrap;'>{display_text}</span>"
             
         rt_txt, rt_col, rt_bg = get_rating_details(row["Score"], is_dark)
         
@@ -897,7 +906,7 @@ def generate_html_rows(day_df, u_sys):
             uv_color = "#22C55E" if uv_val < 3 else ("#F59E0B" if uv_val < 6 else ("#EF4444" if uv_val < 8 else "#B91C1C"))
             uv_html = f'<span class="sf-val-main" style="color: {uv_color}; font-size: 0.95rem;">{uv_val:.0f}</span><br><span class="sf-val-sub">UV</span>'
 
-        html += f'<div class="sf-row"><div class="sf-time">{time_str}</div><div class="sf-col">{surf_str}<br><div class="rating-badge" style="color: {rt_col}; background: {rt_bg};">{rt_txt}</div></div><div class="sf-col">{swell_str}</div><div class="sf-col"><div class="wind-arrow-container"><span class="sf-val-main">{wind_spd_str}</span><span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span></div></div><div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div><div class="sf-col sf-val-main">{wat_str}</div><div class="sf-col">{uv_html}</div></div>'
+        html += f'<div class="sf-row"><div class="sf-time">{time_str}</div><div class="sf-col">{surf_str}<br><div class="rating-badge" style="color: {rt_col} !important; background: {rt_bg}; border: 1.5px solid {rt_col};">{rt_txt}</div></div><div class="sf-col">{swell_str}</div><div class="sf-col"><div class="wind-arrow-container"><span class="sf-val-main">{wind_spd_str}</span><span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span></div></div><div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div><div class="sf-col sf-val-main">{wat_str}</div><div class="sf-col">{uv_html}</div></div>'
     return html
 
 
