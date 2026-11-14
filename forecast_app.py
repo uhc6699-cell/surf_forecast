@@ -11,6 +11,12 @@ if "theme" not in st.session_state:
     st.session_state.theme = "light"
 if "unit" not in st.session_state:
     st.session_state.unit = "metric"
+if "surf_observations" not in st.session_state:
+    st.session_state.surf_observations = pd.DataFrame(columns=[
+        "Spot", "Observed At", "Observed Wave Height (cm)",
+        "Forecast Wave Height (m)", "Swell Height (m)",
+        "Swell Period (s)", "Swell Direction (°)", "Wind Speed (km/h)"
+    ])
 
 st.set_page_config(
     page_title="Surf & Wind Forecast", 
@@ -1006,3 +1012,72 @@ for i, d in enumerate(unique_dates):
         expander_df = day_dl_df[(day_dl_df['DateTime'].dt.hour >= 6) & (day_dl_df['DateTime'].dt.hour % 3 == 0)]
         hourly_html = f'<div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;"><div class="sf-table-container"><div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div><div>UV</div></div>{generate_html_rows(expander_df, unit_sys)}</div></div>'
         st.markdown(hourly_html, unsafe_allow_html=True)
+
+
+# --- Simple surf-observation log for later beach-by-beach calibration ---
+with st.expander("Record actual surf conditions"):
+    st.caption(
+        "Enter the wave height you observed at this beach. The app saves it together "
+        "with the forecast for the selected hour, so we can compare them later."
+    )
+
+    uploaded_observations = st.file_uploader(
+        "Load your previous observations CSV (if you have one)",
+        type=["csv"],
+        key="surf_observations_upload"
+    )
+    if (
+        uploaded_observations is not None
+        and uploaded_observations.getvalue() != st.session_state.get("_loaded_observations_csv")
+    ):
+        try:
+            loaded_observations = pd.read_csv(uploaded_observations)
+            expected_columns = list(st.session_state.surf_observations.columns)
+            if all(column in loaded_observations.columns for column in expected_columns):
+                st.session_state.surf_observations = loaded_observations[expected_columns].copy()
+                st.session_state._loaded_observations_csv = uploaded_observations.getvalue()
+                st.success(f"Loaded {len(loaded_observations)} observation(s).")
+            else:
+                st.error("This CSV does not look like an observations file from this app.")
+        except Exception:
+            st.error("I could not read that CSV file. Please use a CSV downloaded from this app.")
+
+    available_times = df["DateTime"].dt.strftime("%Y-%m-%d %H:%M").tolist()
+    with st.form("surf_observation_form", clear_on_submit=True):
+        observation_time = st.selectbox("When did you check the waves?", available_times)
+        observed_height_cm = st.number_input(
+            "Observed breaking-wave height (cm)",
+            min_value=0,
+            max_value=1000,
+            value=50,
+            step=5
+        )
+        submitted_observation = st.form_submit_button("Save observation")
+
+    if submitted_observation:
+        forecast_row = df.loc[df["DateTime"].dt.strftime("%Y-%m-%d %H:%M") == observation_time].iloc[0]
+        new_observation = {
+            "Spot": selected_spot_name,
+            "Observed At": observation_time,
+            "Observed Wave Height (cm)": int(observed_height_cm),
+            "Forecast Wave Height (m)": forecast_row["Wave Height (m)"],
+            "Swell Height (m)": forecast_row["Swell (m)"],
+            "Swell Period (s)": forecast_row["Swell Period (s)"],
+            "Swell Direction (°)": forecast_row["Swell Direction (°)"],
+            "Wind Speed (km/h)": forecast_row["Wind Speed (km/h)"],
+        }
+        st.session_state.surf_observations = pd.concat(
+            [st.session_state.surf_observations, pd.DataFrame([new_observation])],
+            ignore_index=True
+        )
+        st.success("Observation saved for this visit. Download the CSV below to keep it.")
+
+    if not st.session_state.surf_observations.empty:
+        st.dataframe(st.session_state.surf_observations, use_container_width=True, hide_index=True)
+        observations_csv = st.session_state.surf_observations.to_csv(index=False).encode("utf-8-sig")
+        st.download_button(
+            "Download observations CSV",
+            data=observations_csv,
+            file_name="surf_observations.csv",
+            mime="text/csv"
+        )
