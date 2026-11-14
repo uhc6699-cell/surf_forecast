@@ -628,18 +628,13 @@ html_chart = f"""
 
     let isDragging = false;
     let startX = 0, startY = 0;
+    let dragClientX = null;
     let longPressTimer = null;
+    let autoScrollFrame = null;
+    let previousFrameTime = 0;
 
-  scrollArea.addEventListener("touchstart", (e) => {{
-    if (e.touches.length !== 1) return;
-
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    isDragging = false;
-    clearTimeout(longPressTimer);
-
-    longPressTimer = setTimeout(() => {{
-        const relX = startX - svg.getBoundingClientRect().left;
+    function selectClosestPoint(clientX) {{
+        const relX = clientX - svg.getBoundingClientRect().left;
         let closestIdx = 0;
         let minDst = Infinity;
 
@@ -651,29 +646,96 @@ html_chart = f"""
             }}
         }});
 
-        showData(closestIdx);
-        isDragging = true;
-        if (navigator.vibrate) navigator.vibrate(20);
-    }}, 250);
-}}, {{passive: true}});
+        if (selectedIdx !== closestIdx) showData(closestIdx);
+    }}
+
+    function stopEdgeScroll() {{
+        if (autoScrollFrame !== null) {{
+            cancelAnimationFrame(autoScrollFrame);
+            autoScrollFrame = null;
+        }}
+        previousFrameTime = 0;
+    }}
+
+    function edgeScrollFrame(timestamp) {{
+        if (!isDragging || dragClientX === null) {{
+            stopEdgeScroll();
+            return;
+        }}
+
+        const bounds = scrollArea.getBoundingClientRect();
+        const maxScroll = scrollArea.scrollWidth - scrollArea.clientWidth;
+        const edgeZone = 40;
+
+        if (dragClientX < bounds.right - edgeZone || scrollArea.scrollLeft >= maxScroll) {{
+            stopEdgeScroll();
+            return;
+        }}
+
+        if (!previousFrameTime) previousFrameTime = timestamp;
+        const elapsed = Math.min((timestamp - previousFrameTime) / 1000, 0.05);
+        previousFrameTime = timestamp;
+
+        scrollArea.scrollLeft = Math.min(maxScroll, scrollArea.scrollLeft + 30 * elapsed);
+        selectClosestPoint(dragClientX);
+
+        autoScrollFrame = requestAnimationFrame(edgeScrollFrame);
+    }}
+
+    function startEdgeScroll() {{
+        if (autoScrollFrame === null) {{
+            previousFrameTime = 0;
+            autoScrollFrame = requestAnimationFrame(edgeScrollFrame);
+        }}
+    }}
+
+    scrollArea.addEventListener("touchstart", (e) => {{
+        if (e.touches.length !== 1) return;
+
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        dragClientX = startX;
+        isDragging = false;
+        clearTimeout(longPressTimer);
+
+        longPressTimer = setTimeout(() => {{
+            selectClosestPoint(startX);
+            isDragging = true;
+            startEdgeScroll();
+            if (navigator.vibrate) navigator.vibrate(20);
+        }}, 250);
+    }}, {{passive: true}});
 
     scrollArea.addEventListener("touchmove", (e) => {{
-        if(e.touches.length !== 1) return;
-        
+        if (e.touches.length !== 1) return;
+
         if (!isDragging) {{
             const dx = Math.abs(e.touches[0].clientX - startX);
             const dy = Math.abs(e.touches[0].clientY - startY);
             if (dx > 10 || dy > 10) clearTimeout(longPressTimer);
             return;
         }}
-        
+
         e.preventDefault();
-        const relX = e.touches[0].clientX - svg.getBoundingClientRect().left;
-        let closestIdx = 0;
-        let minDst = Infinity;
-        lineCoords.forEach((lc, lci) => {{
-            const dst = Math.abs(lc.x - relX);
-            if (dst < minDst) {{ minDst = dst; closestIdx = lci; }}
+        dragClientX = e.touches[0].clientX;
+        selectClosestPoint(dragClientX);
+
+        const bounds = scrollArea.getBoundingClientRect();
+        if (dragClientX >= bounds.right - 40) {{
+            startEdgeScroll();
+        }} else {{
+            stopEdgeScroll();
+        }}
+    }}, {{passive: false}});
+
+    scrollArea.addEventListener("touchend", () => {{
+        clearTimeout(longPressTimer);
+        stopEdgeScroll();
+        setTimeout(() => {{
+            isDragging = false;
+            dragClientX = null;
+        }}, 50);
+    }}, {{passive: true}});
         }});
         if (selectedIdx !== closestIdx) showData(closestIdx);
     }}, {{passive: false}});
