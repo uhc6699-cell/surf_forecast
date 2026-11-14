@@ -102,11 +102,19 @@ st.markdown(
         font-size: 0.95rem !important;
         font-weight: 600 !important;
     }}
-    div[data-testid="stSelectbox"] [data-baseweb="select"] input {{
+    div[data-testid="stSelectbox"] [data-baseweb="select"] input,
+    div[data-testid="stSelectbox"] input[role="combobox"],
+    div[data-testid="stSelectbox"] input {{
         color: transparent !important;
         caret-color: transparent !important;
+        font-size: 0 !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        opacity: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
         border: 0 !important;
-        border-bottom: 0 !important;
         outline: none !important;
         box-shadow: none !important;
         text-decoration: none !important;
@@ -118,31 +126,45 @@ st.markdown(
     div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"]:focus-visible {{
         outline: none !important;
         box-shadow: none !important;
+        border-color: {border_color} !important;
         border-bottom-color: {border_color} !important;
     }}
     div[data-testid="stSelectbox"] [data-baseweb="select"] svg {{
         fill: {spot_select_text} !important;
     }}
-    div[data-baseweb="popover"] {{
+    div[data-baseweb="popover"],
+    div[data-baseweb="menu"],
+    [role="listbox"] {{
         background: {spot_option_bg} !important;
     }}
-    div[data-baseweb="popover"] [role="option"] {{
+    div[data-baseweb="popover"] [role="option"],
+    div[data-baseweb="menu"] [role="option"],
+    [role="listbox"] [role="option"] {{
         background: {spot_option_bg} !important;
         color: {spot_option_text} !important;
     }}
-    div[data-baseweb="popover"] [role="option"] * {{
+    div[data-baseweb="popover"] [role="option"] *,
+    div[data-baseweb="menu"] [role="option"] *,
+    [role="listbox"] [role="option"] * {{
         color: {spot_option_text} !important;
     }}
     div[data-baseweb="popover"] [role="option"]:hover,
-    div[data-baseweb="popover"] [role="option"][aria-selected="true"] {{
+    div[data-baseweb="menu"] [role="option"]:hover,
+    [role="listbox"] [role="option"]:hover,
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"],
+    div[data-baseweb="menu"] [role="option"][aria-selected="true"],
+    [role="listbox"] [role="option"][aria-selected="true"] {{
         background: {spot_option_hover} !important;
         color: {spot_option_text} !important;
     }}
     div[data-baseweb="popover"] [role="option"]:hover *,
-    div[data-baseweb="popover"] [role="option"][aria-selected="true"] * {{
+    div[data-baseweb="menu"] [role="option"]:hover *,
+    [role="listbox"] [role="option"]:hover *,
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"] *,
+    div[data-baseweb="menu"] [role="option"][aria-selected="true"] *,
+    [role="listbox"] [role="option"][aria-selected="true"] * {{
         color: {spot_option_text} !important;
-    }}
-    .cam-buttons {{ display: flex; gap: 12px; margin-bottom: 16px; }}
+    }}    .cam-buttons {{ display: flex; gap: 12px; margin-bottom: 16px; }}
     .cam-btn-dark, .cam-btn-light {{
         flex: 1; padding: 12px 10px; border-radius: 8px; text-align: center;
         text-decoration: none !important; font-size: 0.85rem; font-weight: 600;
