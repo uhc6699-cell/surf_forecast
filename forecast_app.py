@@ -335,7 +335,7 @@ def get_forecast_data(lat, lon):
     # הוסר הקישור למודלים הספציפיים שגרמו לתקיעה, וחזרנו לברירת המחדל היציבה של השרת
     marine_url = (
         f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}"
-        f"&hourly=wave_height,wave_period,swell_wave_height,sea_surface_temperature"
+        f"&hourly=wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_direction,sea_surface_temperature"
         f"&current=sea_surface_temperature&timezone=auto&forecast_days=7"
     )
     weather_url = (
@@ -370,6 +370,9 @@ def get_forecast_data(lat, lon):
         "Wave Height (m)": wave_data["hourly"]["wave_height"],
         "Swell (m)": wave_data["hourly"]["swell_wave_height"],
         "Period (s)": wave_data["hourly"]["wave_period"],
+        "Swell Period (s)": wave_data["hourly"].get("swell_wave_period", wave_data["hourly"]["wave_period"]),
+        "Swell Direction (°)": wave_data["hourly"].get("swell_wave_direction", [None] * len(wave_data["hourly"]["time"])),
+        "Wave Direction (°)": wave_data["hourly"].get("wave_direction", [None] * len(wave_data["hourly"]["time"])),
         "Water Temp (°C)": wave_data["hourly"]["sea_surface_temperature"],
         "Wind Speed (km/h)": wind_data["hourly"]["wind_speed_10m"],
         "Wind Direction (°)": wind_data["hourly"]["wind_direction_10m"],
@@ -409,7 +412,12 @@ def is_angle_in_range(angle, start, end):
     return angle >= start or angle <= end
 
 def calculate_surf_rating(row, offshore_range, onshore_range):
-    h, p = row["Wave Height (m)"], row["Period (s)"]
+    h = row["Wave Height (m)"]
+    # Prefer the swell-specific period when available; it better describes
+    # the incoming ground swell than the combined sea-state period.
+    p = row.get("Swell Period (s)", row["Period (s)"])
+    if pd.isna(p):
+        p = row["Period (s)"]
     ws, wd = row["Wind Speed (km/h)"], row["Wind Direction (°)"]
     if pd.isna(h) or h < 0.2: return 1.0
     if h < 0.6: return round(min(4.9, 1.0 + (h / 0.6) * 3.5), 1)
@@ -524,7 +532,7 @@ for _, row in df_chart.iterrows():
         "time": row["Time"], "day": row["Day"], "hour": hour_val,
         "dayIdx": current_day_idx, "ratingColor": hex_color, "rating": f"{row['Score']}/10",
         "wave": fmt_chart_tooltip(val, unit_sys), "swell": fmt_chart_tooltip(row["Swell (m)"], unit_sys), 
-        "period": f"{round(row['Period (s)'],1)}s" if not pd.isna(row["Period (s)"]) else "-",
+        "period": f"{round(row['Swell Period (s)'],1)}s" if not pd.isna(row["Swell Period (s)"]) else "-",
         "windSpeed": f"{round(row['Wind Speed (km/h)'],1)} km/h" if not pd.isna(row["Wind Speed (km/h)"]) else "-",
         "waveRaw": 0.0 if pd.isna(val) else float(val),
         "isMarkedHour": is_marked_hour
@@ -878,7 +886,8 @@ def generate_html_rows(day_df, u_sys):
         rt_txt, rt_col, rt_bg = get_rating_details(row["Score"], is_dark)
         
         sw_m = row["Swell (m)"]
-        sw_p = row["Period (s)"]
+        sw_p = row["Swell Period (s)"]
+        sw_dir = row["Swell Direction (°)"]
         
         if pd.isna(sw_m):
             swell_str = "-"
@@ -891,7 +900,9 @@ def generate_html_rows(day_df, u_sys):
             else:
                 sw_display = f"{round(sw_m * 3.28084, 1)}ft"
                 
-            swell_str = f"<span class='sf-val-main' style='font-size: 0.95rem; white-space: nowrap;'>{sw_display}</span> <span class='sf-val-sub'>{sw_p:.0f}s</span>"
+            period_text = f"{sw_p:.0f}s" if not pd.isna(sw_p) else "-"
+            direction_text = f" · {sw_dir:.0f}°" if not pd.isna(sw_dir) else ""
+            swell_str = f"<span class='sf-val-main' style='font-size: 0.95rem; white-space: nowrap;'>{sw_display}</span> <span class='sf-val-sub'>{period_text}{direction_text}</span>"
         
         w_spd = row["Wind Speed (km/h)"]
         w_dir = row["Wind Direction (°)"]
