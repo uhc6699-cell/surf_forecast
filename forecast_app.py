@@ -163,13 +163,6 @@ st.markdown(
     }}
     .cam-btn-dark {{ background-color: {text_color}; color: {bg_color} !important; }}
     .cam-btn-light {{ background-color: {card_bg}; border: 1px solid {text_color}; color: {text_color} !important; }}
-    .forecast-reference-links {{ display: flex; gap: 8px; margin: -6px 0 14px; }}
-    .forecast-reference-links a {{
-        flex: 1; text-align: center; padding: 9px 6px; border-radius: 8px;
-        background: {card_bg}; border: 1px solid {border_color};
-        color: {text_color} !important; text-decoration: none !important;
-        font-size: 0.78rem; font-weight: 700;
-    }}
     
     .unified-stat-card {{
         background: {card_bg}; border-radius: 16px; padding: 14px 10px;
@@ -309,7 +302,7 @@ st.markdown(
 )
 
 SPOTS = {
-    "Herzliya - Zvulun": {"lat": 32.180, "lon": 34.800, "offshore": (45, 125), "onshore": (235, 315), "cam": "https://www.beachcam.co.il/herzliya.html", "forecast_sources": [("GoSurf", "https://gosurf.co.il/forecast/herzliya-zvulun"), ("Surfline", "https://www.surfline.com/surf-report/zvulun/584204204e65fad6a7709aac"), ("Seanow", "https://seanow.co.il/surf/herzliya-zvulun/")]},
+    "Herzliya - Zvulun": {"lat": 32.180, "lon": 34.800, "offshore": (45, 125), "onshore": (235, 315), "cam": "https://www.beachcam.co.il/herzliya.html"},
     "Herzliya (Marina / Dabush)": {"lat": 32.165, "lon": 34.792, "offshore": (55, 155), "onshore": (235, 335), "cam": "https://www.beachcam.co.il/herzliya.html"},
     "Tel Aviv - Hilton": {"lat": 32.090, "lon": 34.768, "offshore": (55, 155), "onshore": (235, 335), "cam": "https://www.beachcam.co.il/hilton.html"},
     "Tel Aviv - Dolphinarium": {"lat": 32.069, "lon": 34.760, "offshore": (55, 155), "onshore": (235, 335), "cam": "https://www.beachcam.co.il/dolphinarium.html"},
@@ -337,16 +330,6 @@ st.markdown(
     </div>
     """, unsafe_allow_html=True
 )
-if spot.get("forecast_sources"):
-    source_links_html = "".join(
-        f'<a href="{url}" target="_blank" rel="noopener noreferrer">{name} forecast</a>'
-        for name, url in spot["forecast_sources"]
-    )
-    st.markdown(
-        f'<div class="forecast-reference-links">{source_links_html}</div>',
-        unsafe_allow_html=True
-    )
-
 @st.cache_data(ttl=1800)
 def get_forecast_data(lat, lon):
     # הוסר הקישור למודלים הספציפיים שגרמו לתקיעה, וחזרנו לברירת המחדל היציבה של השרת
