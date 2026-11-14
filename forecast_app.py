@@ -25,6 +25,8 @@ is_dark = st.session_state.theme == "dark"
 bg_color = "#0F172A" if is_dark else "#F2EEE5"
 card_bg = "#1E293B" if is_dark else "#FFFFFF"
 text_color = "#F8FAFC" if is_dark else "#1A2B4C"
+spot_select_bg = "#FFFFFF" if is_dark else card_bg
+spot_select_text = "#1A2B4C"
 sub_text = "#94A3B8" if is_dark else "#6B7280"
 border_color = "#334155" if is_dark else "#E5E7EB"
 chart_line = "#38BDF8" if is_dark else "#1A2B4C"
@@ -83,14 +85,30 @@ st.markdown(
     }}
     
     div[data-testid="stSelectbox"] {{ margin-top: -10px; margin-bottom: 10px; }}
-    div[data-testid="stSelectbox"] > div {{
-        background: {card_bg} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; box-shadow: none !important;
+    div[data-testid="stSelectbox"] > div,
+    div[data-testid="stSelectbox"] [data-baseweb="select"] > div {{
+        background: {spot_select_bg} !important;
+        border: 1px solid {border_color} !important;
+        border-radius: 8px !important;
+        box-shadow: none !important;
+        outline: none !important;
     }}
     div[data-testid="stSelectbox"] * {{
-        color: {text_color} !important; text-align: center !important; font-size: 0.95rem !important; font-weight: 600 !important;
+        color: {spot_select_text} !important; text-align: center !important; font-size: 0.95rem !important; font-weight: 600 !important;
     }}
-    
-    .cam-buttons {{ display: flex; gap: 12px; margin-bottom: 16px; }}
+    div[data-testid="stSelectbox"] [data-baseweb="select"] input {{
+        caret-color: transparent !important;
+        outline: none !important;
+        box-shadow: none !important;
+    }}
+    div[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within,
+    div[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div {{
+        outline: none !important;
+        box-shadow: none !important;
+    }}
+    div[data-testid="stSelectbox"] [data-baseweb="select"] svg {{
+        fill: {spot_select_text} !important;
+    }}    .cam-buttons {{ display: flex; gap: 12px; margin-bottom: 16px; }}
     .cam-btn-dark, .cam-btn-light {{
         flex: 1; padding: 12px 10px; border-radius: 8px; text-align: center;
         text-decoration: none !important; font-size: 0.85rem; font-weight: 600;
