@@ -27,6 +27,9 @@ card_bg = "#1E293B" if is_dark else "#FFFFFF"
 text_color = "#F8FAFC" if is_dark else "#1A2B4C"
 spot_select_bg = "#FFFFFF" if is_dark else card_bg
 spot_select_text = "#1A2B4C"
+spot_option_bg = "#1D4ED8" if is_dark else "#FFFFFF"
+spot_option_hover = "#2563EB" if is_dark else "#F3F4F6"
+spot_option_text = "#FFFFFF" if is_dark else "#1A2B4C"
 sub_text = "#94A3B8" if is_dark else "#6B7280"
 border_color = "#334155" if is_dark else "#E5E7EB"
 chart_line = "#38BDF8" if is_dark else "#1A2B4C"
@@ -94,21 +97,52 @@ st.markdown(
         outline: none !important;
     }}
     div[data-testid="stSelectbox"] * {{
-        color: {spot_select_text} !important; text-align: center !important; font-size: 0.95rem !important; font-weight: 600 !important;
+        color: {spot_select_text} !important;
+        text-align: center !important;
+        font-size: 0.95rem !important;
+        font-weight: 600 !important;
     }}
     div[data-testid="stSelectbox"] [data-baseweb="select"] input {{
+        color: transparent !important;
         caret-color: transparent !important;
+        border: 0 !important;
+        border-bottom: 0 !important;
         outline: none !important;
         box-shadow: none !important;
+        text-decoration: none !important;
+        background: transparent !important;
     }}
     div[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within,
-    div[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div {{
+    div[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div,
+    div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"]:focus,
+    div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"]:focus-visible {{
         outline: none !important;
         box-shadow: none !important;
+        border-bottom-color: {border_color} !important;
     }}
     div[data-testid="stSelectbox"] [data-baseweb="select"] svg {{
         fill: {spot_select_text} !important;
-    }}    .cam-buttons {{ display: flex; gap: 12px; margin-bottom: 16px; }}
+    }}
+    div[data-baseweb="popover"] {{
+        background: {spot_option_bg} !important;
+    }}
+    div[data-baseweb="popover"] [role="option"] {{
+        background: {spot_option_bg} !important;
+        color: {spot_option_text} !important;
+    }}
+    div[data-baseweb="popover"] [role="option"] * {{
+        color: {spot_option_text} !important;
+    }}
+    div[data-baseweb="popover"] [role="option"]:hover,
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"] {{
+        background: {spot_option_hover} !important;
+        color: {spot_option_text} !important;
+    }}
+    div[data-baseweb="popover"] [role="option"]:hover *,
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"] * {{
+        color: {spot_option_text} !important;
+    }}
+    .cam-buttons {{ display: flex; gap: 12px; margin-bottom: 16px; }}
     .cam-btn-dark, .cam-btn-light {{
         flex: 1; padding: 12px 10px; border-radius: 8px; text-align: center;
         text-decoration: none !important; font-size: 0.85rem; font-weight: 600;
