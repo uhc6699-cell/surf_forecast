@@ -736,15 +736,6 @@ html_chart = f"""
             dragClientX = null;
         }}, 50);
     }}, {{passive: true}});
-        }});
-        if (selectedIdx !== closestIdx) showData(closestIdx);
-    }}, {{passive: false}});
-
-    scrollArea.addEventListener("touchend", () => {{
-        clearTimeout(longPressTimer);
-        setTimeout(() => {{ isDragging = false; }}, 50);
-    }}, {{passive: true}});
-
     scrollArea.addEventListener("click", (e) => {{
         if (isDragging) return; 
         const relX = e.clientX - svg.getBoundingClientRect().left;
