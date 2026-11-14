@@ -673,8 +673,15 @@ html_chart = f"""
         const bounds = scrollArea.getBoundingClientRect();
         const maxScroll = scrollArea.scrollWidth - scrollArea.clientWidth;
         const edgeZone = 40;
+        let direction = 0;
 
-        if (dragClientX < bounds.right - edgeZone || scrollArea.scrollLeft >= maxScroll) {{
+        if (dragClientX >= bounds.right - edgeZone && scrollArea.scrollLeft < maxScroll) {{
+            direction = 1;
+        }} else if (dragClientX <= bounds.left + edgeZone && scrollArea.scrollLeft > 0) {{
+            direction = -1;
+        }}
+
+        if (direction === 0) {{
             stopEdgeScroll();
             return;
         }}
@@ -683,7 +690,7 @@ html_chart = f"""
         const elapsed = Math.min((timestamp - previousFrameTime) / 1000, 0.05);
         previousFrameTime = timestamp;
 
-        scrollArea.scrollLeft = Math.min(maxScroll, scrollArea.scrollLeft + 30 * elapsed);
+        scrollArea.scrollLeft = Math.max(0, Math.min(maxScroll, scrollArea.scrollLeft + direction * 45 * elapsed));
         selectClosestPoint(dragClientX);
 
         autoScrollFrame = requestAnimationFrame(edgeScrollFrame);
@@ -728,7 +735,7 @@ html_chart = f"""
         selectClosestPoint(dragClientX);
 
         const bounds = scrollArea.getBoundingClientRect();
-        if (dragClientX >= bounds.right - 40) {{
+        if (dragClientX >= bounds.right - 40 || dragClientX <= bounds.left + 40) {{
             startEdgeScroll();
         }} else {{
             stopEdgeScroll();
