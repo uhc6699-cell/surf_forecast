@@ -630,24 +630,32 @@ html_chart = f"""
     let startX = 0, startY = 0;
     let longPressTimer = null;
 
-    scrollArea.addEventListener("touchstart", (e) => {{
-        if(e.touches.length !== 1) return;
-        startX = e.touches.length > 0 ? e.touches[0].clientX : 0;
-        startY = e.touches.length > 0 ? e.touches[0].clientY : 0;
-        isDragging = false;
+  scrollArea.addEventListener("touchstart", (e) => {{
+    if (e.touches.length !== 1) return;
 
-        if (isBoxVisible) {{
-            const relX = startX - svg.getBoundingClientRect().left;
-            const currentScrubX = parseFloat(scrubLine.getAttribute("x1"));
-            
-            if (Math.abs(relX - currentScrubX) < 40) {{
-                longPressTimer = setTimeout(() => {{
-                    isDragging = true;
-                    if(navigator.vibrate) navigator.vibrate(20);
-                }}, 250);
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    isDragging = false;
+    clearTimeout(longPressTimer);
+
+    longPressTimer = setTimeout(() => {{
+        const relX = startX - svg.getBoundingClientRect().left;
+        let closestIdx = 0;
+        let minDst = Infinity;
+
+        lineCoords.forEach((point, index) => {{
+            const distance = Math.abs(point.x - relX);
+            if (distance < minDst) {{
+                minDst = distance;
+                closestIdx = index;
             }}
-        }}
-    }}, {{passive: true}});
+        }});
+
+        showData(closestIdx);
+        isDragging = true;
+        if (navigator.vibrate) navigator.vibrate(20);
+    }}, 250);
+}}, {{passive: true}});
 
     scrollArea.addEventListener("touchmove", (e) => {{
         if(e.touches.length !== 1) return;
