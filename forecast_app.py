@@ -102,43 +102,26 @@ st.markdown(
         font-size: 0.95rem !important;
         font-weight: 600 !important;
     }}
-       div[data-testid="stSelectbox"] [data-baseweb="select"],
+    div[data-testid="stSelectbox"] [data-baseweb="select"],
     div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
     div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"] {{
         cursor: pointer !important;
     }}
-    div[data-testid="stSelectbox"] [data-baseweb="select"] input,
-    div[data-testid="stSelectbox"] input[role="combobox"],
-    div[data-testid="stSelectbox"] input {{
-        pointer-events: none !important;
-        color: transparent !important;
+    div[data-testid="stSelectbox"] [data-baseweb="select"] input {{
         caret-color: transparent !important;
-        font-size: 0 !important;
-        width: 0 !important;
-        min-width: 0 !important;
-        max-width: 0 !important;
-        opacity: 0 !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        border: 0 !important;
-        outline: none !important;
-        box-shadow: none !important;
-        text-decoration: none !important;
-        background: transparent !important;
     }}
-    div[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within,
-    div[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div,
-    div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"]:focus,
-    div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"]:focus-visible {{
+    div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"],
+    div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"] * {{
+        color: {spot_select_text} !important;
+    }}
+    div[data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div {{
         outline: none !important;
         box-shadow: none !important;
         border-color: {border_color} !important;
-        border-bottom-color: {border_color} !important;
     }}
     div[data-testid="stSelectbox"] [data-baseweb="select"] svg {{
         fill: {spot_select_text} !important;
-    }}
-    div[data-baseweb="popover"],
+    }}    div[data-baseweb="popover"],
     div[data-baseweb="menu"],
     [role="listbox"] {{
         background: {spot_option_bg} !important;
