@@ -32,11 +32,12 @@ spot_option_hover = "#2563EB" if is_dark else "#F3F4F6"
 spot_option_text = "#FFFFFF" if is_dark else "#1A2B4C"
 sub_text = "#94A3B8" if is_dark else "#6B7280"
 border_color = "#334155" if is_dark else "#E5E7EB"
+table_divider_color = "#64748B" if is_dark else "#CBD5E1"
 chart_line = "#38BDF8" if is_dark else "#1A2B4C"
 chart_grad_top = "#38BDF8" if is_dark else "#8997A8"
 grid_color = "#334155" if is_dark else "#CBD5E1"
 db_cell_bg = "#0F172A" if is_dark else "#F9FAFB"
-wave_badge_bg = "rgba(26, 43, 76, 0.24)" if is_dark else "rgba(26, 43, 76, 0.10)"
+wave_badge_bg = "rgba(26, 43, 76, 0.38)" if is_dark else "rgba(26, 43, 76, 0.16)"
 
 active_bg = text_color
 active_fg = bg_color
@@ -247,7 +248,7 @@ st.markdown(
         align-items: center;
     }}
     .sf-header-row > div:not(:last-child), .sf-row > div:not(:last-child) {{
-        border-right: 1px solid {border_color};
+        border-right: 1.5px solid {table_divider_color};
     }}
     
     .sf-time {{ font-size: 0.8rem; font-weight: 600; color: {sub_text}; }}
@@ -557,7 +558,7 @@ html_chart = f"""
   .y-axis {{
     width: 35px; flex-shrink: 0; display: flex; flex-direction: column;
     justify-content: space-between; padding: 22px 4px 34px 0; text-align: right;
-    font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1px solid {border_color};
+    font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1.5px solid {table_divider_color};
     line-height: 1;
   }}
   .scroll-area {{
