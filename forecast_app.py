@@ -26,7 +26,7 @@ bg_color = "#0F172A" if is_dark else "#F2EEE5"
 card_bg = "#1E293B" if is_dark else "#FFFFFF"
 text_color = "#F8FAFC" if is_dark else "#1A2B4C"
 spot_select_bg = "#FFFFFF" if is_dark else card_bg
-spot_select_text = "#1A2B4C"
+spot_select_text = "#102A43"
 spot_option_bg = "#1D4ED8" if is_dark else "#FFFFFF"
 spot_option_hover = "#2563EB" if is_dark else "#F3F4F6"
 spot_option_text = "#FFFFFF" if is_dark else "#1A2B4C"
@@ -102,7 +102,14 @@ st.markdown(
         font-size: 0.95rem !important;
         font-weight: 600 !important;
     }}
-    div[data-testid="stSelectbox"] [data-baseweb="select"] input,
+    div[data-testid="stSelectbox"] [data-baseweb="select"],
+    div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
+    div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"] {{
+        cursor: pointer !important;
+    }}
+    div[data-testid="stSelectbox"] [data-baseweb="select"] input {{
+        pointer-events: none !important;
+    }}    div[data-testid="stSelectbox"] [data-baseweb="select"] input,
     div[data-testid="stSelectbox"] input[role="combobox"],
     div[data-testid="stSelectbox"] input {{
         color: transparent !important;
