@@ -11,12 +11,6 @@ if "theme" not in st.session_state:
     st.session_state.theme = "light"
 if "unit" not in st.session_state:
     st.session_state.unit = "metric"
-if "surf_observations" not in st.session_state:
-    st.session_state.surf_observations = pd.DataFrame(columns=[
-        "Spot", "Observed At", "Observed Wave Height (cm)",
-        "Forecast Wave Height (m)", "Swell Height (m)",
-        "Swell Period (s)", "Swell Direction (°)", "Wind Speed (km/h)"
-    ])
 
 st.set_page_config(
     page_title="Surf & Wind Forecast", 
@@ -169,6 +163,13 @@ st.markdown(
     }}
     .cam-btn-dark {{ background-color: {text_color}; color: {bg_color} !important; }}
     .cam-btn-light {{ background-color: {card_bg}; border: 1px solid {text_color}; color: {text_color} !important; }}
+    .forecast-reference-links {{ display: flex; gap: 8px; margin: -6px 0 14px; }}
+    .forecast-reference-links a {{
+        flex: 1; text-align: center; padding: 9px 6px; border-radius: 8px;
+        background: {card_bg}; border: 1px solid {border_color};
+        color: {text_color} !important; text-decoration: none !important;
+        font-size: 0.78rem; font-weight: 700;
+    }}
     
     .unified-stat-card {{
         background: {card_bg}; border-radius: 16px; padding: 14px 10px;
@@ -308,6 +309,7 @@ st.markdown(
 )
 
 SPOTS = {
+    "Herzliya - Zvulun": {"lat": 32.180, "lon": 34.800, "offshore": (45, 125), "onshore": (235, 315), "cam": "https://www.beachcam.co.il/herzliya.html", "forecast_sources": [("GoSurf", "https://gosurf.co.il/forecast/herzliya-zvulun"), ("Surfline", "https://www.surfline.com/surf-report/zvulun/584204204e65fad6a7709aac"), ("Seanow", "https://seanow.co.il/surf/herzliya-zvulun/")]},
     "Herzliya (Marina / Dabush)": {"lat": 32.165, "lon": 34.792, "offshore": (55, 155), "onshore": (235, 335), "cam": "https://www.beachcam.co.il/herzliya.html"},
     "Tel Aviv - Hilton": {"lat": 32.090, "lon": 34.768, "offshore": (55, 155), "onshore": (235, 335), "cam": "https://www.beachcam.co.il/hilton.html"},
     "Tel Aviv - Dolphinarium": {"lat": 32.069, "lon": 34.760, "offshore": (55, 155), "onshore": (235, 335), "cam": "https://www.beachcam.co.il/dolphinarium.html"},
@@ -317,7 +319,7 @@ SPOTS = {
 }
 
 # Centered Spot Selector & Dark Mode Toggle
-selected_spot_name = st.selectbox("", list(SPOTS.keys()), label_visibility="collapsed")
+selected_spot_name = st.selectbox("", list(SPOTS.keys()), index=0, label_visibility="collapsed")
 new_theme = st.toggle("Dark Mode", value=is_dark, key="theme_toggle")
 
 if new_theme != is_dark:
@@ -335,6 +337,15 @@ st.markdown(
     </div>
     """, unsafe_allow_html=True
 )
+if spot.get("forecast_sources"):
+    source_links_html = "".join(
+        f'<a href="{url}" target="_blank" rel="noopener noreferrer">{name} forecast</a>'
+        for name, url in spot["forecast_sources"]
+    )
+    st.markdown(
+        f'<div class="forecast-reference-links">{source_links_html}</div>',
+        unsafe_allow_html=True
+    )
 
 @st.cache_data(ttl=1800)
 def get_forecast_data(lat, lon):
@@ -1014,70 +1025,3 @@ for i, d in enumerate(unique_dates):
         st.markdown(hourly_html, unsafe_allow_html=True)
 
 
-# --- Simple surf-observation log for later beach-by-beach calibration ---
-with st.expander("Record actual surf conditions"):
-    st.caption(
-        "Enter the wave height you observed at this beach. The app saves it together "
-        "with the forecast for the selected hour, so we can compare them later."
-    )
-
-    uploaded_observations = st.file_uploader(
-        "Load your previous observations CSV (if you have one)",
-        type=["csv"],
-        key="surf_observations_upload"
-    )
-    if (
-        uploaded_observations is not None
-        and uploaded_observations.getvalue() != st.session_state.get("_loaded_observations_csv")
-    ):
-        try:
-            loaded_observations = pd.read_csv(uploaded_observations)
-            expected_columns = list(st.session_state.surf_observations.columns)
-            if all(column in loaded_observations.columns for column in expected_columns):
-                st.session_state.surf_observations = loaded_observations[expected_columns].copy()
-                st.session_state._loaded_observations_csv = uploaded_observations.getvalue()
-                st.success(f"Loaded {len(loaded_observations)} observation(s).")
-            else:
-                st.error("This CSV does not look like an observations file from this app.")
-        except Exception:
-            st.error("I could not read that CSV file. Please use a CSV downloaded from this app.")
-
-    available_times = df["DateTime"].dt.strftime("%Y-%m-%d %H:%M").tolist()
-    with st.form("surf_observation_form", clear_on_submit=True):
-        observation_time = st.selectbox("When did you check the waves?", available_times)
-        observed_height_cm = st.number_input(
-            "Observed breaking-wave height (cm)",
-            min_value=0,
-            max_value=1000,
-            value=50,
-            step=5
-        )
-        submitted_observation = st.form_submit_button("Save observation")
-
-    if submitted_observation:
-        forecast_row = df.loc[df["DateTime"].dt.strftime("%Y-%m-%d %H:%M") == observation_time].iloc[0]
-        new_observation = {
-            "Spot": selected_spot_name,
-            "Observed At": observation_time,
-            "Observed Wave Height (cm)": int(observed_height_cm),
-            "Forecast Wave Height (m)": forecast_row["Wave Height (m)"],
-            "Swell Height (m)": forecast_row["Swell (m)"],
-            "Swell Period (s)": forecast_row["Swell Period (s)"],
-            "Swell Direction (°)": forecast_row["Swell Direction (°)"],
-            "Wind Speed (km/h)": forecast_row["Wind Speed (km/h)"],
-        }
-        st.session_state.surf_observations = pd.concat(
-            [st.session_state.surf_observations, pd.DataFrame([new_observation])],
-            ignore_index=True
-        )
-        st.success("Observation saved for this visit. Download the CSV below to keep it.")
-
-    if not st.session_state.surf_observations.empty:
-        st.dataframe(st.session_state.surf_observations, use_container_width=True, hide_index=True)
-        observations_csv = st.session_state.surf_observations.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "Download observations CSV",
-            data=observations_csv,
-            file_name="surf_observations.csv",
-            mime="text/csv"
-        )
