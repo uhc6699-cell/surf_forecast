@@ -102,16 +102,15 @@ st.markdown(
         font-size: 0.95rem !important;
         font-weight: 600 !important;
     }}
-    div[data-testid="stSelectbox"] [data-baseweb="select"],
+       div[data-testid="stSelectbox"] [data-baseweb="select"],
     div[data-testid="stSelectbox"] [data-baseweb="select"] > div,
     div[data-testid="stSelectbox"] [data-baseweb="select"] [role="combobox"] {{
         cursor: pointer !important;
     }}
-    div[data-testid="stSelectbox"] [data-baseweb="select"] input {{
-        pointer-events: none !important;
-    }}    div[data-testid="stSelectbox"] [data-baseweb="select"] input,
+    div[data-testid="stSelectbox"] [data-baseweb="select"] input,
     div[data-testid="stSelectbox"] input[role="combobox"],
     div[data-testid="stSelectbox"] input {{
+        pointer-events: none !important;
         color: transparent !important;
         caret-color: transparent !important;
         font-size: 0 !important;
