@@ -254,13 +254,19 @@ st.markdown(
     .sf-val-main {{ font-size: 0.95rem; font-weight: 800; margin-bottom: 2px; }}
     .sf-val-sub {{ font-size: 0.75rem; font-weight: 600; color: {text_color}; }}
     
+    .sf-row > div:nth-child(2) {{
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }}
     .wave-height-badge {{
-        display: inline-block;
+        display: block;
+        width: 100%;
+        box-sizing: border-box;
         background: {wave_badge_bg};
-        border: 1px solid rgba(26, 43, 76, 0.16);
         border-radius: 6px;
-        padding: 3px 7px;
+        padding: 10px 4px;
         line-height: 1.15;
+        text-align: center;
     }}
     .rating-badge {{
         display: inline-block; font-size: 0.65rem; font-weight: 800;
@@ -906,7 +912,7 @@ def generate_html_rows(day_df, u_sys):
             uv_color = "#22C55E" if uv_val < 3 else ("#F59E0B" if uv_val < 6 else ("#EF4444" if uv_val < 8 else "#B91C1C"))
             uv_html = f'<span class="sf-val-main" style="color: {uv_color}; font-size: 0.95rem;">{uv_val:.0f}</span><br><span class="sf-val-sub">UV</span>'
 
-        html += f'<div class="sf-row"><div class="sf-time">{time_str}</div><div class="sf-col">{surf_str}<br><div class="rating-badge" style="color: {rt_col} !important; background: {rt_bg}; border: 1.5px solid {rt_col};">{rt_txt}</div></div><div class="sf-col">{swell_str}</div><div class="sf-col"><div class="wind-arrow-container"><span class="sf-val-main">{wind_spd_str}</span><span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span></div></div><div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div><div class="sf-col sf-val-main">{wat_str}</div><div class="sf-col">{uv_html}</div></div>'
+        html += f'<div class="sf-row"><div class="sf-time">{time_str}</div><div class="sf-col">{surf_str}<br><div class="rating-badge" style="color: {rt_col} !important; background: {rt_bg};">{rt_txt}</div></div><div class="sf-col">{swell_str}</div><div class="sf-col"><div class="wind-arrow-container"><span class="sf-val-main">{wind_spd_str}</span><span class="wind-arrow" style="transform: rotate({arrow_deg}deg); display: inline-block;">↓</span></div></div><div class="sf-col sf-val-main" style="font-size: 1rem;">{w_icon} {air_str}</div><div class="sf-col sf-val-main">{wat_str}</div><div class="sf-col">{uv_html}</div></div>'
     return html
 
 
