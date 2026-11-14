@@ -508,26 +508,25 @@ html_chart = f"""
     const rawPoints = {json.dumps(points_data)};
     const maxWave = {max_wave_m};
     
-    const normalStepX = 21; 
-    const gapStepX = 2; 
+    const normalStepX = 21;
     const padLeft = 14, padRight = 20, padTop = 26, padBottom = 38;
-    
-    let currentX = padLeft;
-    const coords = rawPoints.map((p, i) => {{
-      if (p.isGap) {{
-        currentX += gapStepX;
-        return {{ ...p, x: currentX }};
-      }} else {{
-        if (i > 0) currentX += normalStepX;
-        return {{ 
-          ...p, 
-          x: currentX, 
-          y: padTop + (185 - padTop - padBottom) * (1 - Math.min(1, Math.max(0.04, p.waveRaw / maxWave))) 
-        }};
-      }}
+    const dayWidth = normalStepX * 8;
+    const validRawPoints = rawPoints.filter(p => !p.isGap);
+    const dayCount = validRawPoints.length
+      ? Math.max(...validRawPoints.map(p => p.dayIdx)) + 1
+      : 1;
+
+    const coords = rawPoints.map(p => {{
+      const dayStartX = padLeft + p.dayIdx * dayWidth;
+      if (p.isGap) return {{ ...p, x: dayStartX }};
+      return {{
+        ...p,
+        x: dayStartX + (p.hour / 24) * dayWidth,
+        y: padTop + (185 - padTop - padBottom) * (1 - Math.min(1, Math.max(0.04, p.waveRaw / maxWave)))
+      }};
     }});
-    
-    const svgWidth = Math.max(400, currentX + padRight);
+
+    const svgWidth = Math.max(400, padLeft + dayCount * dayWidth + padRight);
     const svg = document.getElementById("waveSvg");
     svg.setAttribute("width", svgWidth);
     
@@ -544,26 +543,34 @@ html_chart = f"""
       return el;
     }}
     
-    let bandStart = 0;
-    for (let i = 1; i <= coords.length; i++) {{
-      if (i === coords.length || coords[i].dayIdx !== coords[bandStart].dayIdx) {{
-        const x1 = bandStart === 0 ? 0 : (coords[bandStart - 1].x + coords[bandStart].x) / 2;
-        const x2 = i === coords.length ? svgWidth : (coords[i - 1].x + coords[i].x) / 2;
-        
-        if (bandStart > 0) {{
-          svg.appendChild(createSvg("line", {{ x1: x1, y1: 0, x2: x1, y2: 185 - padBottom, stroke: "{grid_color}", "stroke-width": "1.5", "stroke-dasharray": "4,4" }}));
-        }}
-        
-        const midX = (x1 + x2) / 2;
-        const dayLabel = createSvg("text", {{ x: midX, y: padTop - 10, fill: "{text_color}", "font-size": "11", "font-weight": "800", "text-anchor": "middle" }});
-        dayLabel.textContent = coords[bandStart].day;
-        svg.appendChild(dayLabel);
-        
-        bandStart = i;
-      }}
-    }}
-    
     const lineCoords = coords.filter(c => !c.isGap);
+    for (let dayIdx = 0; dayIdx < dayCount; dayIdx++) {{
+      const dayPoint = lineCoords.find(point => point.dayIdx === dayIdx);
+      if (!dayPoint) continue;
+
+      const dayStartX = padLeft + dayIdx * dayWidth;
+      if (dayIdx > 0) {{
+        svg.appendChild(createSvg("line", {{
+          x1: dayStartX, y1: 0, x2: dayStartX, y2: 185 - padBottom,
+          stroke: "{grid_color}", "stroke-width": "1.5", "stroke-dasharray": "4,4"
+        }}));
+      }}
+
+      for (let third = 1; third <= 2; third++) {{
+        const dividerX = dayStartX + (dayWidth * third) / 3;
+        svg.appendChild(createSvg("line", {{
+          x1: dividerX, y1: padTop, x2: dividerX, y2: 185 - padBottom,
+          stroke: "{grid_color}", "stroke-width": "1", "stroke-dasharray": "2,5", opacity: "0.65"
+        }}));
+      }}
+
+      const dayLabel = createSvg("text", {{
+        x: dayStartX + dayWidth / 2, y: padTop - 10,
+        fill: "{text_color}", "font-size": "11", "font-weight": "800", "text-anchor": "middle"
+      }});
+      dayLabel.textContent = dayPoint.day;
+      svg.appendChild(dayLabel);
+    }}
     let pathD = "";
     lineCoords.forEach((c, idx) => {{
         if (idx === 0) pathD += `M ${{c.x}} ${{c.y}}`;
