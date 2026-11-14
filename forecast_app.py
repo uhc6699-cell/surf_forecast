@@ -11,8 +11,7 @@ if "theme" not in st.session_state:
     st.session_state.theme = "light"
 if "unit" not in st.session_state:
     st.session_state.unit = "metric"
-[theme]
-base = "light"
+
 st.set_page_config(
     page_title="Surf & Wind Forecast", 
     page_icon="🌊", 
