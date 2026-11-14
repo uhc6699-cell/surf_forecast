@@ -248,7 +248,7 @@ st.markdown(
         align-items: center;
     }}
     .sf-header-row > div:not(:last-child), .sf-row > div:not(:last-child) {{
-        border-right: 1.5px solid {table_divider_color};
+        border-right: 1px solid {table_divider_color};
     }}
     
     .sf-time {{ font-size: 0.8rem; font-weight: 600; color: {sub_text}; }}
@@ -558,7 +558,7 @@ html_chart = f"""
   .y-axis {{
     width: 35px; flex-shrink: 0; display: flex; flex-direction: column;
     justify-content: space-between; padding: 22px 4px 34px 0; text-align: right;
-    font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1.5px solid {table_divider_color};
+    font-size: 9px; font-weight: 600; color: {sub_text}; border-right: 1px solid {table_divider_color};
     line-height: 1;
   }}
   .scroll-area {{
