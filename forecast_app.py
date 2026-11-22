@@ -433,8 +433,9 @@ def calculate_surf_rating(row, offshore_range, onshore_range):
 
     return min(10.0, max(5.0, round(height_score + period_score + wind_score, 1)))
 
-def get_rating_details(score, is_dark_theme):
-    if score >= 7.0: 
+def get_rating_details(score, is_dark_theme, wave_height_m):
+    is_at_least_three_feet = not pd.isna(wave_height_m) and wave_height_m >= 0.9144
+    if score >= 7.0 and is_at_least_three_feet:
         return "GOOD", ("#4ADE80" if is_dark_theme else "#15803D"), "rgba(72, 187, 120, 0.15)"
     elif score >= 5.0: 
         return "FAIR", ("#FBBF24" if is_dark_theme else "#B45309"), "rgba(236, 201, 75, 0.15)"
@@ -513,7 +514,7 @@ df_chart = df[df["DateTime"].dt.hour % 3 == 0]
 
 for _, row in df_chart.iterrows():
     val = row["Wave Height (m)"]
-    _, hex_color, _ = get_rating_details(row["Score"], is_dark)
+    _, hex_color, _ = get_rating_details(row["Score"], is_dark, val)
     current_day_idx = int(row["DayIdx"])
     
     if prev_day_idx is not None and current_day_idx != prev_day_idx:
@@ -886,7 +887,7 @@ def generate_html_rows(day_df, u_sys):
                 
             surf_str = f"<span class='sf-val-main wave-height-badge' style='color: {wv_color} !important; font-size: 0.95rem; white-space: nowrap;'>{display_text}</span>"
             
-        rt_txt, rt_col, rt_bg = get_rating_details(row["Score"], is_dark)
+        rt_txt, rt_col, rt_bg = get_rating_details(row["Score"], is_dark, wv_m)
         
         sw_m = row["Swell (m)"]
         sw_p = row["Swell Period (s)"]
