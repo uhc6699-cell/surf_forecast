@@ -335,7 +335,7 @@ def get_forecast_data(lat, lon):
     # הוסר הקישור למודלים הספציפיים שגרמו לתקיעה, וחזרנו לברירת המחדל היציבה של השרת
     marine_url = (
         f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}"
-        f"&hourly=wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_direction,sea_surface_temperature"
+        f"&hourly=wave_height,wave_period,wave_direction,swell_wave_height,swell_wave_period,swell_wave_peak_period,swell_wave_direction,sea_surface_temperature"
         f"&current=sea_surface_temperature&timezone=auto&forecast_days=7"
     )
     weather_url = (
@@ -365,12 +365,35 @@ def get_forecast_data(lat, lon):
                 st.warning("⏳ שרת הנתונים לא מגיב כרגע גם לאחר מספר ניסיונות. אנא רענן את העמוד מאוחר יותר.")
                 st.stop()
 
+    hourly_waves = wave_data["hourly"]
+    wave_count = len(hourly_waves["time"])
+    mean_swell_period = pd.to_numeric(
+        pd.Series(hourly_waves.get("swell_wave_period", [None] * wave_count)),
+        errors="coerce"
+    )
+    peak_swell_period = pd.to_numeric(
+        pd.Series(hourly_waves.get("swell_wave_peak_period", [None] * wave_count)),
+        errors="coerce"
+    )
+    combined_wave_period = pd.to_numeric(
+        pd.Series(hourly_waves.get("wave_period", [None] * wave_count)),
+        errors="coerce"
+    )
+    # Surf forecasts usually refer to the dominant/peak swell period.
+    # Fall back to mean swell period, then total wave period, when unavailable.
+    surf_period_values = (
+        peak_swell_period
+        .combine_first(mean_swell_period)
+        .combine_first(combined_wave_period)
+        .tolist()
+    )
+
     df = pd.DataFrame({
         "DateTime": pd.to_datetime(wave_data["hourly"]["time"]),
         "Wave Height (m)": wave_data["hourly"]["wave_height"],
         "Swell (m)": wave_data["hourly"]["swell_wave_height"],
         "Period (s)": wave_data["hourly"]["wave_period"],
-        "Swell Period (s)": wave_data["hourly"].get("swell_wave_period", wave_data["hourly"]["wave_period"]),
+        "Swell Period (s)": surf_period_values,
         "Swell Direction (°)": wave_data["hourly"].get("swell_wave_direction", [None] * len(wave_data["hourly"]["time"])),
         "Wave Direction (°)": wave_data["hourly"].get("wave_direction", [None] * len(wave_data["hourly"]["time"])),
         "Water Temp (°C)": wave_data["hourly"]["sea_surface_temperature"],
