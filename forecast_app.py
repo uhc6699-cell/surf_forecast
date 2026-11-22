@@ -727,7 +727,7 @@ html_chart = f"""
     let autoScrollFrame = null;
     let previousFrameTime = 0;
 
-    function selectClosestPoint(clientX) {{
+    function selectClosestPoint(clientX, vibrateOnChange = false) {{
         const relX = clientX - svg.getBoundingClientRect().left;
         let closestIdx = 0;
         let minDst = Infinity;
@@ -740,7 +740,10 @@ html_chart = f"""
             }}
         }});
 
-        if (selectedIdx !== closestIdx) showData(closestIdx);
+        if (selectedIdx !== closestIdx) {{
+            showData(closestIdx);
+            if (vibrateOnChange && navigator.vibrate) navigator.vibrate(12);
+        }}
     }}
 
     function stopEdgeScroll() {{
@@ -778,7 +781,7 @@ html_chart = f"""
         previousFrameTime = timestamp;
 
         scrollArea.scrollLeft = Math.max(0, Math.min(maxScroll, scrollArea.scrollLeft + direction * 45 * elapsed));
-        selectClosestPoint(dragClientX);
+        selectClosestPoint(dragClientX, true);
 
         autoScrollFrame = requestAnimationFrame(edgeScrollFrame);
     }}
@@ -819,7 +822,7 @@ html_chart = f"""
 
         e.preventDefault();
         dragClientX = e.touches[0].clientX;
-        selectClosestPoint(dragClientX);
+        selectClosestPoint(dragClientX, true);
 
         const bounds = scrollArea.getBoundingClientRect();
         if (dragClientX >= bounds.right - 40 || dragClientX <= bounds.left + 40) {{
@@ -1006,5 +1009,4 @@ for i, d in enumerate(unique_dates):
         expander_df = day_dl_df[(day_dl_df['DateTime'].dt.hour >= 6) & (day_dl_df['DateTime'].dt.hour % 3 == 0)]
         hourly_html = f'<div class="sf-table-wrapper" style="box-shadow: none; border: none; margin-bottom: 0;"><div class="sf-table-container"><div class="sf-header-row" style="border-top-left-radius: 12px; border-top-right-radius: 12px;"><div></div><div>Surf</div><div>Swell</div><div>Wind</div><div>Weather</div><div>Water</div><div>UV</div></div>{generate_html_rows(expander_df, unit_sys)}</div></div>'
         st.markdown(hourly_html, unsafe_allow_html=True)
-
 
