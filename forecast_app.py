@@ -742,7 +742,7 @@ html_chart = f"""
 
         if (selectedIdx !== closestIdx) {{
             showData(closestIdx);
-            if (vibrateOnChange && navigator.vibrate) navigator.vibrate(12);
+            if (vibrateOnChange && navigator.vibrate) navigator.vibrate(8);
         }}
     }}
 
